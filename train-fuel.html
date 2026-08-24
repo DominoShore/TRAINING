@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Train/Fuel">
+<meta name="theme-color" content="#141414">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Train / Fuel</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  :root {
+    --bg: #141414;
+    --surface: #1D1C19;
+    --surface-alt: #262420;
+    --text: #F2EFE9;
+    --text-dim: #9C9890;
+    --accent: #E8B93F;
+    --accent-dim: #6b5c2c;
+    --fuel: #8FA35E;
+    --danger: #C1443C;
+    --border: #34322C;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--text);
+    font-family: 'Inter', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .display { font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 0.03em; }
+  .mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+
+  .shell { max-width: 720px; margin: 0 auto; padding: 20px 16px 90px; min-height: 100vh; }
+  .top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 18px; border-bottom: 2px solid var(--border); padding-bottom: 12px; }
+  .top h1 { font-size: 26px; margin: 0; font-weight: 700; font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 0.03em; }
+  .top .date { color: var(--text-dim); font-size: 13px; font-family: 'JetBrains Mono', monospace; }
+
+  .tabbar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 2px solid var(--border); display: flex; justify-content: center; z-index: 20; padding-bottom: env(safe-area-inset-bottom); }
+  .tabbar-inner { max-width: 720px; width: 100%; display: flex; }
+  .tab-btn { flex: 1; background: none; border: none; color: var(--text-dim); display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px 12px; cursor: pointer; font-size: 11px; font-family: 'Oswald', sans-serif; letter-spacing: 0.05em; text-transform: uppercase; border-top: 2px solid transparent; }
+  .tab-btn.active { color: var(--accent); border-top-color: var(--accent); }
+  .tab-btn.active.fuel-active { color: var(--fuel); border-top-color: var(--fuel); }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 16px; margin-bottom: 14px; }
+  .card h2 { font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 0.04em; font-size: 14px; color: var(--text-dim); margin: 0 0 12px; }
+
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat-box { background: var(--surface-alt); border: 1px solid var(--border); border-radius: 4px; padding: 12px; }
+  .stat-box .num { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; }
+  .stat-box .lbl { color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+
+  .gauge-row { margin-bottom: 12px; }
+  .gauge-head { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; color: var(--text-dim); }
+  .gauge-head .val { font-family: 'JetBrains Mono', monospace; color: var(--text); }
+  .gauge-track { height: 10px; background: var(--surface-alt); border: 1px solid var(--border); border-radius: 2px; overflow: hidden; }
+  .gauge-fill { height: 100%; transition: width 0.3s ease; }
+
+  button.action { background: var(--accent); color: #1a1a1a; border: none; font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; font-size: 13px; padding: 10px 14px; border-radius: 3px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  button.action.fuel { background: var(--fuel); }
+  button.action.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  button.action:disabled { opacity: 0.4; }
+  button.icon-btn { background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 4px; display: flex; align-items: center; font-size: 16px; }
+  button.icon-btn:active { color: var(--danger); }
+
+  input, select { background: var(--surface-alt); border: 1px solid var(--border); color: var(--text); border-radius: 3px; padding: 8px 10px; font-family: 'Inter', sans-serif; font-size: 13px; width: 100%; }
+  label.field { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 10px; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+
+  .plate-strip { display: flex; flex-wrap: wrap; gap: 6px; }
+  .plate { background: var(--surface-alt); border: 2px solid var(--accent-dim); border-radius: 50%; width: 52px; height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; }
+  .plate .w { font-size: 13px; font-weight: 700; color: var(--accent); line-height: 1; }
+  .plate .r { font-size: 9px; color: var(--text-dim); margin-top: 1px; }
+
+  .list-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .list-item:last-child { border-bottom: none; }
+  .empty { color: var(--text-dim); font-size: 13px; text-align: center; padding: 20px 8px; }
+
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: flex-end; justify-content: center; z-index: 50; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--accent); border-radius: 8px 8px 0 0; padding: 18px 16px 24px; max-width: 720px; width: 100%; max-height: 85vh; overflow-y: auto; }
+  .modal.fuel-modal { border-top-color: var(--fuel); }
+  .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .modal-head h3 { font-family: 'Oswald', sans-serif; text-transform: uppercase; margin: 0; font-size: 17px; }
+
+  .day-btn { flex-direction: column; gap: 2px; font-size: 11px; padding: 8px 4px; position: relative; }
+  .day-btn .muscle { display: block; font-size: 9px; opacity: 0.8; }
+  .day-dot { position: absolute; top: -6px; right: -6px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ---------- Constants ----------
+const DAYS = [
+  { day: 1, muscle: "Push" },
+  { day: 2, muscle: "Pull" },
+  { day: 3, muscle: "Legs" },
+  { day: 4, muscle: "Upper Body" },
+];
+const DAY_COLOR = { 1: "#E8B93F", 2: "#D97A3F", 3: "#8FA35E", 4: "#5E8FA3" };
+const dayMuscle = (day) => (DAYS.find(d => d.day === day) || {}).muscle || "";
+
+const SEED_EXERCISES = [
+  { name: "Smith Machine Flat Bench Press", day: 1, target: "3×5–8" },
+  { name: "Cable Crossover — High-to-Low", day: 1, target: "2×10–15" },
+  { name: "Seated Dumbbell Shoulder Press", day: 1, target: "3×6–10" },
+  { name: "Cable Lateral Raise", day: 1, target: "3×12–20" },
+  { name: "Close-Grip Bench Press", day: 1, target: "" },
+  { name: "Overhead Cable Triceps Extension", day: 1, target: "" },
+  { name: "Chest-Supported Row", day: 2, target: "" },
+  { name: "Supinated-Grip Lat Pulldown", day: 2, target: "" },
+  { name: "Straight-Arm Cable Pulldown", day: 2, target: "" },
+  { name: "Dumbbell High Pull", day: 2, target: "" },
+  { name: "EZ-Bar Curl", day: 2, target: "" },
+  { name: "Standing Dumbbell Curl", day: 2, target: "" },
+  { name: "Face Pull", day: 2, target: "" },
+  { name: "Hack Squat", day: 3, target: "" },
+  { name: "Leg Press", day: 3, target: "" },
+  { name: "Seated Leg Curl", day: 3, target: "" },
+  { name: "Leg Extension", day: 3, target: "" },
+  { name: "ISO Leg Extension (one at a time)", day: 3, target: "" },
+  { name: "Standing Calf Raise", day: 3, target: "" },
+  { name: "Seated Calf Raise", day: 3, target: "" },
+  { name: "Leg Raise", day: 3, target: "" },
+  { name: "Incline Dumbbell Press", day: 4, target: "" },
+  { name: "Cable Crossover — Low-to-High", day: 4, target: "" },
+  { name: "Single-Arm Cable Row", day: 4, target: "" },
+  { name: "Neutral-Grip Lat Pulldown", day: 4, target: "" },
+  { name: "Dumbbell Lateral Raise", day: 4, target: "" },
+  { name: "Incline Dumbbell Curl", day: 4, target: "" },
+  { name: "Triceps Pushdown", day: 4, target: "" },
+].map(e => ({ id: uid(), ...e }));
+
+// Foods get added here as you tell them to Claude in chat — re-upload the file
+// and any new ones merge into your existing database automatically, without
+// touching foods you've already added or logged yourself.
+const SEED_FOODS = [
+  { name: "Lime & coriander microwave rice (250g pack)", calories: 375, protein: 9, carbs: 73, fat: 6 },
+  { name: "Lightly smoked salmon, Aldi — raw (225g portion)", calories: 697, protein: 46, carbs: 0, fat: 56 },
+  { name: "Alpro vanilla yogurt (250g)", calories: 165, protein: 9.5, carbs: 20, fat: 5.5 },
+  { name: "Oats (80g dry)", calories: 303, protein: 10.5, carbs: 54, fat: 5 },
+  { name: "3 eggs, scrambled with butter (225g)", calories: 339, protein: 20, carbs: 4, fat: 26 },
+  { name: "Peanut butter & olive oil spread on toast, seeded wholemeal (2 slices)", calories: 451, protein: 18, carbs: 38, fat: 27 },
+  { name: "Chicken thighs, bone-in \u2192 baked & deboned (~185g cooked)", calories: 345, protein: 46, carbs: 0, fat: 17 },
+  { name: "Soy & ginger sticky rice, Tilda (250g pack)", calories: 405, protein: 7, carbs: 78, fat: 6 },
+  { name: "Pasta, dry, fusilli/penne (100g)", calories: 371, protein: 13, carbs: 75, fat: 1.5 },
+];
+
+function uid() { return Math.random().toString(36).slice(2, 10); }
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+function fmtDate(d) {
+  const dt = new Date(d + "T00:00:00");
+  return dt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// ---------- Persistence ----------
+const STORAGE_KEY = "trainFuelData_v1";
+function loadDB() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        workout: Object.assign({ exercises: SEED_EXERCISES, sessions: [], currentDay: 1, dayLog: [] }, parsed.workout || {}),
+        nutrition: Object.assign({ foods: [], logs: [], targets: { calories: 3100, protein: 180, carbs: 400, fat: 85 } }, parsed.nutrition || {}),
+      };
+    }
+  } catch (e) { console.error("load failed", e); }
+  return {
+    workout: { exercises: SEED_EXERCISES, sessions: [], currentDay: 1, dayLog: [] },
+    nutrition: { foods: [], logs: [], targets: { calories: 3100, protein: 180, carbs: 400, fat: 85 } },
+  };
+}
+function saveDB() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); }
+  catch (e) { console.error("save failed", e); }
+}
+
+function mergeSeedFoods(db) {
+  const existingNames = new Set(db.nutrition.foods.map(f => f.name.trim().toLowerCase()));
+  let added = false;
+  SEED_FOODS.forEach(f => {
+    if (!existingNames.has(f.name.trim().toLowerCase())) {
+      db.nutrition.foods.push({ id: uid(), ...f });
+      existingNames.add(f.name.trim().toLowerCase());
+      added = true;
+    }
+  });
+  return added;
+}
+
+let DB = loadDB();
+if (mergeSeedFoods(DB)) saveDB();
+let UI = { tab: "today", viewDay: DB.workout.currentDay || 1, modal: null, historyDate: todayStr() };
+
+// ---------- Derived helpers ----------
+function todaysSets() { const t = todayStr(); return DB.workout.sessions.filter(s => s.date === t); }
+function todaysLogs() { const t = todayStr(); return DB.nutrition.logs.filter(l => l.date === t); }
+function todaysTotals() {
+  return todaysLogs().reduce((acc, l) => ({
+    calories: acc.calories + l.calories, protein: acc.protein + l.protein,
+    carbs: acc.carbs + l.carbs, fat: acc.fat + l.fat,
+  }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+}
+function tonnageToday() {
+  return todaysSets().reduce((acc, s) => acc + s.sets.reduce((a, x) => a + x.weight * x.reps, 0), 0);
+}
+function historyFor(exerciseId) {
+  return DB.workout.sessions.filter(s => s.exerciseId === exerciseId).sort((a, b) => a.date < b.date ? -1 : 1);
+}
+
+// ---------- Date-based helpers (for History tab) ----------
+function setsForDate(date) { return DB.workout.sessions.filter(s => s.date === date); }
+function logsForDate(date) { return DB.nutrition.logs.filter(l => l.date === date); }
+function totalsForDate(date) {
+  return logsForDate(date).reduce((acc, l) => ({
+    calories: acc.calories + l.calories, protein: acc.protein + l.protein,
+    carbs: acc.carbs + l.carbs, fat: acc.fat + l.fat,
+  }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+}
+function tonnageForDate(date) {
+  return setsForDate(date).reduce((acc, s) => acc + s.sets.reduce((a, x) => a + x.weight * x.reps, 0), 0);
+}
+function dayLogEntriesForDate(date) { return DB.workout.dayLog.filter(d => d.date === date); }
+function allActivityDates() {
+  const set = new Set();
+  DB.workout.sessions.forEach(s => set.add(s.date));
+  DB.nutrition.logs.forEach(l => set.add(l.date));
+  return [...set].sort((a, b) => b < a ? -1 : 1); // descending, most recent first
+}
+
+// ---------- Render ----------
+function render() {
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    <div class="shell">
+      <div class="top">
+        <h1>Train / Fuel</h1>
+        <div class="date">${fmtDate(todayStr())}</div>
+      </div>
+      ${UI.tab === "today" ? renderToday() : renderHistory()}
+    </div>
+    <div class="tabbar">
+      <div class="tabbar-inner">
+        <button class="tab-btn ${UI.tab === "today" ? "active" : ""}" data-action="tab" data-tab="today">Today</button>
+        <button class="tab-btn ${UI.tab === "history" ? "active fuel-active" : ""}" data-action="tab" data-tab="history">History</button>
+      </div>
+    </div>
+    ${renderModal()}
+  `;
+}
+
+function macroGauges(totals, targets) {
+  const rows = [
+    { key: "calories", label: "Calories", color: "#E8B93F", unit: "" },
+    { key: "protein", label: "Protein", color: "#8FA35E", unit: "g" },
+    { key: "carbs", label: "Carbs", color: "#5E8FA3", unit: "g" },
+    { key: "fat", label: "Fat", color: "#C1443C", unit: "g" },
+  ];
+  return rows.map(r => {
+    const val = Math.round(totals[r.key]);
+    const target = targets[r.key] || 1;
+    const pct = Math.min(100, (val / target) * 100);
+    return `
+      <div class="gauge-row">
+        <div class="gauge-head"><span>${r.label}</span><span class="val">${val}${r.unit} / ${target}${r.unit}</span></div>
+        <div class="gauge-track"><div class="gauge-fill" style="width:${pct}%;background:${r.color}"></div></div>
+      </div>`;
+  }).join("");
+}
+
+function renderToday() {
+  const viewDay = UI.viewDay;
+  const dayExercises = DB.workout.exercises.filter(e => e.day === viewDay);
+  const isNextDay = viewDay === DB.workout.currentDay;
+  const lastDayDone = [...DB.workout.dayLog].reverse().find(d => d.day === viewDay);
+
+  const dayButtons = DAYS.map(d => `
+    <button class="action ghost day-btn" data-action="setViewDay" data-day="${d.day}"
+      style="border-color:${viewDay === d.day ? DAY_COLOR[d.day] : 'var(--border)'};color:${viewDay === d.day ? DAY_COLOR[d.day] : 'var(--text-dim)'};">
+      Day ${d.day}<span class="muscle">${d.muscle}</span>
+      ${DB.workout.currentDay === d.day ? '<span class="day-dot"></span>' : ""}
+    </button>`).join("");
+
+  const exerciseRows = dayExercises.map(ex => {
+    const hist = historyFor(ex.id);
+    const last = hist[hist.length - 1];
+    return `
+      <div style="border-bottom:1px solid var(--border);padding:10px 0;">
+        <div class="list-item" style="border-bottom:none;padding:0;">
+          <div>
+            <div style="font-weight:600;">${escapeHtml(ex.name)}</div>
+            ${ex.target ? `<span class="mono" style="font-size:11px;color:var(--text-dim);">target ${escapeHtml(ex.target)}</span>` : ""}
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="action" style="font-size:11px;padding:6px 10px;background:${DAY_COLOR[ex.day]};" data-action="openLogSets" data-id="${ex.id}">+ Log</button>
+            <button class="icon-btn" data-action="deleteExercise" data-id="${ex.id}">✕</button>
+          </div>
+        </div>
+        ${last ? `
+          <div style="margin-top:8px;">
+            <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;">Match or beat — ${fmtDate(last.date)}</div>
+            <div class="plate-strip">${last.sets.map(s => `<div class="plate"><div class="w">${s.weight}</div><div class="r">×${s.reps}</div></div>`).join("")}</div>
+          </div>` : `<div style="font-size:11px;color:var(--text-dim);margin-top:4px;">No history yet — this'll set the baseline.</div>`}
+      </div>`;
+  }).join("");
+
+  const logs = todaysLogs(), totals = todaysTotals();
+  const logRows = logs.map(l => `
+    <div class="list-item">
+      <div>
+        <div style="font-weight:600;">${escapeHtml(l.foodName)}</div>
+        <div class="mono" style="font-size:11px;color:var(--text-dim);">${l.servings}× · ${l.calories} kcal · P${l.protein} C${l.carbs} F${l.fat}</div>
+      </div>
+      <button class="icon-btn" data-action="deleteLog" data-id="${l.id}">✕</button>
+    </div>`).join("");
+
+  const foodDbQuery = (UI.foodDbQuery || "").trim().toLowerCase();
+  const filteredFoods = foodDbQuery
+    ? DB.nutrition.foods.filter(f => f.name.toLowerCase().includes(foodDbQuery))
+    : DB.nutrition.foods;
+  const foodRows = filteredFoods.map(f => `
+    <div class="list-item">
+      <div>
+        <div style="font-weight:600;">${escapeHtml(f.name)}</div>
+        <div class="mono" style="font-size:11px;color:var(--text-dim);">${f.calories} kcal · P${f.protein} C${f.carbs} F${f.fat} <span style="opacity:0.7;">(per serving)</span></div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="action fuel" style="font-size:11px;padding:6px 10px;" data-action="openLogFood" data-id="${f.id}">+ Log</button>
+        <button class="icon-btn" data-action="deleteFood" data-id="${f.id}">✕</button>
+      </div>
+    </div>`).join("");
+
+  return `
+    <div class="card">
+      <h2>Training</h2>
+      <div class="row" style="margin-bottom:12px;gap:6px;">${dayButtons}</div>
+      ${isNextDay
+        ? `<div class="mono" style="font-size:11px;color:var(--accent);margin-bottom:10px;">● This is your next day up</div>`
+        : `<div class="mono" style="font-size:11px;color:var(--text-dim);margin-bottom:10px;">Viewing Day ${viewDay} — next up is Day ${DB.workout.currentDay}</div>`}
+      ${lastDayDone ? `<div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;">Last done: ${fmtDate(lastDayDone.date)}</div>` : ""}
+      ${dayExercises.length === 0 ? `<div class="empty">No exercises on this day yet. Add some below.</div>` : exerciseRows}
+      <button class="action ghost" style="margin-top:12px;" data-action="openAddExercise">+ Add Exercise to Day ${viewDay}</button>
+    </div>
+    ${dayExercises.length > 0 ? `<button class="action" style="width:100%;justify-content:center;padding:13px 14px;margin-bottom:14px;" data-action="markDayComplete">Mark Day ${viewDay} Complete → Next: Day ${viewDay === 4 ? 1 : viewDay + 1}</button>` : ""}
+
+    <div class="card">
+      <h2>Today's Fuel</h2>
+      ${macroGauges(totals, DB.nutrition.targets)}
+      <button class="action ghost" style="margin-top:4px;font-size:11px;padding:6px 10px;" data-action="openTargets">Edit Targets</button>
+    </div>
+    <div class="card">
+      <h2>Today's Log</h2>
+      ${logs.length === 0 ? `<div class="empty">Nothing logged yet — add what you've eaten below.</div>` : logRows}
+      <button class="action fuel" style="margin-top:12px;" data-action="openLogMeal">+ Log a Meal</button>
+    </div>
+    <div class="card">
+      <h2>Food Database</h2>
+      <label class="field">Search your foods
+        <input id="food-db-search" placeholder="Start typing…" value="${escapeHtml(UI.foodDbQuery || "")}" data-action="foodDbSearch" />
+      </label>
+      ${DB.nutrition.foods.length === 0
+        ? `<div class="empty">No foods yet. Type above to search once you've added some, or search online below.</div>`
+        : filteredFoods.length === 0
+          ? `<div class="empty">No match for "${escapeHtml(UI.foodDbQuery)}" in your database.</div>
+             <button class="action fuel" style="width:100%;justify-content:center;margin-top:8px;" data-action="openSearchFoodFromDb">🔍 Search Online for "${escapeHtml(UI.foodDbQuery)}"</button>`
+          : foodRows}
+      <button class="action ghost" style="margin-top:12px;width:100%;justify-content:center;" data-action="openSearchFood">🔍 Search Food Online</button>
+      <div class="row" style="margin-top:8px;">
+        <button class="action ghost" data-action="openAddFood">+ Add Manually</button>
+        <button class="action ghost" data-action="openBulkAdd">Paste Multiple</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Backup &amp; Restore</h2>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">
+        Data lives only in this browser. Back up occasionally in case you clear site data or switch phones.
+      </div>
+      <div class="row">
+        <button class="action ghost" data-action="exportBackup">Export Backup</button>
+        <button class="action ghost" data-action="triggerImport">Restore Backup</button>
+      </div>
+      <input type="file" id="import-file-input" accept="application/json" style="display:none;" />
+      <div id="backup-status" class="mono" style="font-size:11px;color:var(--accent);margin-top:10px;"></div>
+    </div>
+  `;
+}
+
+function renderHistory() {
+  const date = UI.historyDate || todayStr();
+  const dayLogs = dayLogEntriesForDate(date);
+  const sets = setsForDate(date);
+  const logs = logsForDate(date);
+  const totals = totalsForDate(date);
+  const dates = allActivityDates();
+
+  const trainingBlock = dayLogs.length === 0 && sets.length === 0
+    ? `<div class="empty">No training logged this day.</div>`
+    : `
+      ${dayLogs.map(d => `<div style="font-size:12px;color:var(--accent);margin-bottom:8px;">✓ Day ${d.day} — ${dayMuscle(d.day)} marked complete</div>`).join("")}
+      ${sets.map(s => `
+        <div style="border-bottom:1px solid var(--border);padding:8px 0;">
+          <div style="font-weight:600;font-size:13px;">${escapeHtml(s.exerciseName)}</div>
+          <div class="plate-strip" style="margin-top:6px;">${s.sets.map(x => `<div class="plate"><div class="w">${x.weight}</div><div class="r">×${x.reps}</div></div>`).join("")}</div>
+        </div>`).join("")}
+    `;
+
+  const foodBlock = logs.length === 0
+    ? `<div class="empty">No food logged this day.</div>`
+    : logs.map(l => `
+        <div class="list-item">
+          <div>
+            <div style="font-weight:600;">${escapeHtml(l.foodName)}</div>
+            <div class="mono" style="font-size:11px;color:var(--text-dim);">${l.servings}× · ${l.calories} kcal · P${l.protein} C${l.carbs} F${l.fat}</div>
+          </div>
+          <button class="icon-btn" data-action="deleteLog" data-id="${l.id}">✕</button>
+        </div>`).join("");
+
+  const quickDates = dates.slice(0, 10).map(d => `
+    <button class="action ghost" style="font-size:11px;padding:6px 10px;flex:0 0 auto;border-color:${d === date ? 'var(--fuel)' : 'var(--border)'};color:${d === date ? 'var(--fuel)' : 'var(--text-dim)'};" data-action="setHistoryDate" data-date="${d}">${fmtDate(d)}</button>
+  `).join("");
+
+  return `
+    <div class="card">
+      <h2>Browse a Day</h2>
+      <label class="field">Pick a date<input type="date" id="history-date-input" value="${date}" max="${todayStr()}" /></label>
+      ${dates.length > 0 ? `<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;">${quickDates}</div>` : ""}
+    </div>
+    <div class="card">
+      <h2>Training — ${fmtDate(date)}</h2>
+      ${trainingBlock}
+    </div>
+    <div class="card">
+      <h2>Fuel — ${fmtDate(date)}</h2>
+      ${macroGauges(totals, DB.nutrition.targets)}
+      <div style="margin-top:12px;">${foodBlock}</div>
+    </div>
+  `;
+}
+
+// ---------- Modals ----------
+function renderModal() {
+  const m = UI.modal;
+  if (!m) return "";
+  if (m.type === "addExercise") {
+    return `
+      <div class="modal-backdrop" data-action="closeModal">
+        <div class="modal">
+          <div class="modal-head"><h3>Add Exercise</h3><button class="icon-btn" data-action="closeModal">✕</button></div>
+          <label class="field">Name<input id="f-name" placeholder="e.g. Meadows Row" autofocus /></label>
+          <label class="field">Day
+            <select id="f-day">${DAYS.map(d => `<option value="${d.day}" ${d.day === m.day ? "selected" : ""}>Day ${d.day} — ${d.muscle}</option>`).join("")}</select>
+          </label>
+          <label class="field">Target (optional)<input id="f-target" placeholder="e.g. 3×6–10" /></label>
+          <button class="action" data-action="saveAddExercise">+ Save Exercise</button>
+        </div>
+      </div>`;
+  }
+  if (m.type === "logSets") {
+    const ex = DB.workout.exercises.find(e => e.id === m.exerciseId);
+    const sets = m.sets;
+    return `
+      <div class="modal-backdrop" data-action="closeModal">
+        <div class="modal">
+          <div class="modal-head"><h3>${escapeHtml(ex.name)}</h3><button class="icon-btn" data-action="closeModal">✕</button></div>
+          ${sets.map((s, i) => `
+            <div class="row" style="align-items:flex-end;">
+              <label class="field">Weight (kg)<input type="number" inputmode="decimal" data-action="setField" data-idx="${i}" data-field="weight" value="${s.weight}" /></label>
+              <label class="field">Reps<input type="number" inputmode="numeric" data-action="setField" data-idx="${i}" data-field="reps" value="${s.reps}" /></label>
+              ${sets.length > 1 ? `<button class="icon-btn" data-action="removeSetRow" data-idx="${i}">✕</button>` : ""}
+            </div>`).join("")}
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button class="action ghost" data-action="addSetRow">+ Add Set</button>
+            <button class="action" data-action="saveLogSets">Save Sets</button>
+          </div>
+        </div>
+      </div>`;
+  }
+  if (m.type === "addFood") {
+    return `
+      <div class="modal-backdrop" data-action="closeModal">
+        <div class="modal fuel-modal">
+          <div class="modal-head"><h3>Add Food</h3><button class="icon-btn" data-action="closeModal">✕</button></div>
+          <label class="field">Name<input id="f-name" placeholder="e.g. Chicken breast, 150g" autofocus /></label>
+          <div class="row">
+            <label class="field">Calories<input id="f-cal" type="number" /></label>
+            <label class="field">Protein (g)<input id="f-pro" type="number" /></label>
+          </div>
+          <div class="row">
+            <label class="field">Carbs (g)<input id="f-carb" type="number" /></label>
+            <label class="field">Fat (g)<input id="f-fat" type="number" /></label>
+          </div>
+          <button class="action fuel" data-action="saveAddFood">+ Save Food</button>
+        </div>
+      </div>`;
+  }
+  if (m.type === "logFood") {
+    const f = DB.nutrition.foods.find(x => x.id === m.foodId);
+    const n = Number(m.servings) || 0;
+    return `
+      <div class="modal-backdrop" data-action="closeModal">
+        <div class="modal fuel-modal">
+          <div class="modal-head"><h3>${escapeHtml(f.name)}</h3><button class="icon-btn" data-action="closeModal">✕</button></div>
+          <label class="field">Servings<input id="f-servings" type="number" step="0.5" value="${m.servings}" data-action="updateServings" autofocus /></label>
+          <div class="mono" style="font-size:12px;color:var(--text-dim);margin-bottom:14px;">
+            → ${Math.round(f.calories * n)} kcal · P${Math.round(f.protein * n)} C${Math.round(f.carbs * n)} F${Math.round(f.fat * n)}
+          </div>
+          <button class="action fuel" data-action="saveLogFood" ${n <= 0 ? "disabled" : ""}>+ Log It</button>
+        </div>
+      </div>`;
+  }
+  if (m.type === "targets") {
+    const t = m.targets;
+    return `
+      <div class="modal-backdrop" data-action="closeModal">
+        <div class="modal fuel-modal">
+          <div class="modal-head"><h3>Daily Targets</h3><button class="icon-btn" data-action="closeModal">✕</button></div>
+          <label class="field">Calories<input id="t-cal" type="number" value="${t.calories}" /></label>
+          <div class="row">
+            <label class="field">Protein (g)<input id="t-pro" type="number" value="${t.protein}" /></label>
+            <label class="field">Carbs (g)<input id="t-carb" type="number" value="${t.carbs}" /></label>
+            <label class="field">Fat (g)<input id="t-fat" type="number" value="${t.fat}" /></label>
+          </div>
+          <button class="action fuel" data-action="saveTargets">Save Targets</button>
+        </div>
+      </div>`;
+  }
+  if (m.type === "logMeal") {
+    const q = (m.query || "").toLowerCase();
+    const foods = DB.nutrition.foods.filter(f => f.name.toLowerCase().includes(q));
+    const anyChecked = Object.values(m.picks).some(v => Number(v) > 0);
+    const rows = foods.map(f => {
+      const val = m.picks[f.id] || "";
+      return `
+        <div class="row" style="align-items:flex-end;margin-bottom:8px;">
+          <div style="flex:2;">
+            <div style="font-weight:600;font-size:13px;">${escapeHtml(f.name)}</div>
+            <div class="mono" style="font-size:10px;color:var(--text-dim);">${f.calories} kcal/serving</div>
+          </div>
+          <label class="field" style="flex:1;margin-bottom:0;">Servings
+            <input type="number" step="0.1" inputmode="decimal" data-action="mealPick" data-id="${f.id}" value="${val}" placeholder="0" />
+          </label>
+        </div>`;
+    }).join("");
+    return `
+      <div class="modal-backdrop" data-action="closeModal">
+        <div class="modal fuel-modal">
+          <div class="modal-head"><h3>Log a Meal</h3><button class="icon-btn" data-action="closeModal">✕</button></div>
+          <label class="field">Search foods<input id="meal-search" placeholder="type to filter…" value="${escapeHtml(m.query || "")}" data-action="mealSearch" autofocus /></label>
+          ${foods.length === 0 ? `<div class="empty">No foods match. Add foods to your database first.</div>` : rows}
+          <button class="action fuel" style="margin-top:10px;" data-action="saveLogMeal" ${anyChecked ? "" : "disabled"}>Log Meal</button>
+        </div>
+      </div>`;
+  }
+  if (m.type === "bulkAddFoods") {
+    return `
+      <div class="modal-backdrop" data-action="closeModal">
+        <div class="modal fuel-modal">
+          <div class="modal-head"><h3>Paste Multiple Foods</h3><button class="icon-btn" data-action="closeModal">✕</button></div>
+          <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">
+            One food per line: <span class="mono">Name, calories, protein, carbs, fat</span> — values per 100g (or your usual serving).
+          </div>
+          <label class="field">Paste here
+            <textarea id="bulk-text" rows="8" style="width:100%;background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:3px;padding:8px 10px;font-family:'JetBrains Mono',monospace;font-size:12px;" placeholder="Chicken breast (per 100g), 165, 31, 0, 3.6
+Microwave rice (per 100g), 130, 2.7, 28, 0.3">${escapeHtml(m.text || "")}</textarea>
+          </label>
+          <div id="bulk-status" class="mono" style="font-size:11px;color:var(--danger);margin-bottom:8px;">${m.status ? escapeHtml(m.status) : ""}</div>
+          <button class="action fuel" data-action="saveBulkAdd">Add All</button>
+        </div>
+      </div>`;
+  }
+  if (m.type === "searchFood") {
+    const results = m.results || [];
+    const resultRows = results.map((r, i) => `
+      <div class="list-item">
+        <div>
+          <div style="font-weight:600;font-size:13px;">${escapeHtml(r.name)}</div>
+          ${r.brand ? `<div style="font-size:11px;color:var(--text-dim);">${escapeHtml(r.brand)}</div>` : ""}
+          <div class="mono" style="font-size:11px;color:var(--text-dim);">${r.calories} kcal · P${r.protein} C${r.carbs} F${r.fat} <span style="opacity:0.7;">/100g</span></div>
+        </div>
+        <button class="action fuel" style="font-size:11px;padding:6px 10px;" data-action="addSearchResult" data-idx="${i}">+ Add</button>
+      </div>`).join("");
+    return `
+      <div class="modal-backdrop" data-action="closeModal">
+        <div class="modal fuel-modal">
+          <div class="modal-head"><h3>Search Food Online</h3><button class="icon-btn" data-action="closeModal">✕</button></div>
+          <div class="row" style="margin-bottom:10px;">
+            <input id="search-food-input" placeholder="e.g. Aldi smoked salmon" value="${escapeHtml(m.query || "")}" />
+            <button class="action fuel" style="flex:0 0 auto;" data-action="runFoodSearch">Search</button>
+          </div>
+          <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;">
+            Searches Open Food Facts — a free, open database of packaged/branded foods. Works best for supermarket products, not homemade meals.
+          </div>
+          ${m.loading ? `<div class="empty">Searching…</div>` : ""}
+          ${m.error ? `<div class="empty" style="color:var(--danger);">${escapeHtml(m.error)}</div>` : ""}
+          ${!m.loading && !m.error && m.searched && results.length === 0 ? `<div class="empty">No results with full nutrition data. Try a simpler search term, or add it manually.</div>` : ""}
+          ${resultRows}
+        </div>
+      </div>`;
+  }
+  return "";
+}
+
+// ---------- Actions ----------
+function handleAction(action, el) {
+  switch (action) {
+    case "tab":
+      UI.tab = el.dataset.tab;
+      if (UI.tab === "today") UI.viewDay = DB.workout.currentDay;
+      if (UI.tab === "history" && !UI.historyDate) UI.historyDate = todayStr();
+      break;
+    case "setViewDay":
+      UI.viewDay = Number(el.dataset.day);
+      break;
+    case "setHistoryDate":
+      UI.historyDate = el.dataset.date;
+      break;
+    case "openAddExercise":
+      UI.modal = { type: "addExercise", day: UI.viewDay };
+      break;
+    case "saveAddExercise": {
+      const name = document.getElementById("f-name").value.trim();
+      const day = Number(document.getElementById("f-day").value);
+      const target = document.getElementById("f-target").value.trim();
+      if (name) {
+        DB.workout.exercises.push({ id: uid(), name, day, target });
+        saveDB();
+        UI.modal = null;
+      }
+      break;
+    }
+    case "deleteExercise":
+      DB.workout.exercises = DB.workout.exercises.filter(e => e.id !== el.dataset.id);
+      saveDB();
+      break;
+    case "openLogSets":
+      UI.modal = { type: "logSets", exerciseId: el.dataset.id, sets: [{ weight: "", reps: "" }] };
+      break;
+    case "addSetRow":
+      UI.modal.sets.push({ weight: UI.modal.sets[UI.modal.sets.length - 1]?.weight || "", reps: "" });
+      break;
+    case "removeSetRow":
+      UI.modal.sets.splice(Number(el.dataset.idx), 1);
+      break;
+    case "saveLogSets": {
+      const ex = DB.workout.exercises.find(e => e.id === UI.modal.exerciseId);
+      const sets = UI.modal.sets.map(s => ({ weight: Number(s.weight) || 0, reps: Number(s.reps) || 0 }));
+      DB.workout.sessions.push({ id: uid(), date: todayStr(), exerciseId: ex.id, exerciseName: ex.name, sets });
+      saveDB();
+      UI.modal = null;
+      break;
+    }
+    case "markDayComplete": {
+      const day = UI.viewDay;
+      const nextDay = day === 4 ? 1 : day + 1;
+      DB.workout.dayLog.push({ day, date: todayStr() });
+      DB.workout.currentDay = nextDay;
+      saveDB();
+      UI.viewDay = nextDay;
+      break;
+    }
+    case "openAddFood":
+      UI.modal = { type: "addFood" };
+      break;
+    case "saveAddFood": {
+      const name = document.getElementById("f-name").value.trim();
+      const calories = Number(document.getElementById("f-cal").value) || 0;
+      const protein = Number(document.getElementById("f-pro").value) || 0;
+      const carbs = Number(document.getElementById("f-carb").value) || 0;
+      const fat = Number(document.getElementById("f-fat").value) || 0;
+      if (name) {
+        DB.nutrition.foods.push({ id: uid(), name, calories, protein, carbs, fat });
+        saveDB();
+        UI.modal = null;
+      }
+      break;
+    }
+    case "deleteFood":
+      DB.nutrition.foods = DB.nutrition.foods.filter(f => f.id !== el.dataset.id);
+      saveDB();
+      break;
+    case "openLogFood":
+      UI.modal = { type: "logFood", foodId: el.dataset.id, servings: "1" };
+      break;
+    case "saveLogFood": {
+      const f = DB.nutrition.foods.find(x => x.id === UI.modal.foodId);
+      const servings = Number(UI.modal.servings) || 0;
+      if (servings > 0) {
+        DB.nutrition.logs.push({
+          id: uid(), date: todayStr(), foodId: f.id, foodName: f.name, servings,
+          calories: Math.round(f.calories * servings), protein: Math.round(f.protein * servings),
+          carbs: Math.round(f.carbs * servings), fat: Math.round(f.fat * servings),
+        });
+        saveDB();
+        UI.modal = null;
+      }
+      break;
+    }
+    case "deleteLog":
+      DB.nutrition.logs = DB.nutrition.logs.filter(l => l.id !== el.dataset.id);
+      saveDB();
+      break;
+    case "openTargets":
+      UI.modal = { type: "targets", targets: { ...DB.nutrition.targets } };
+      break;
+    case "saveTargets": {
+      DB.nutrition.targets = {
+        calories: Number(document.getElementById("t-cal").value) || 0,
+        protein: Number(document.getElementById("t-pro").value) || 0,
+        carbs: Number(document.getElementById("t-carb").value) || 0,
+        fat: Number(document.getElementById("t-fat").value) || 0,
+      };
+      saveDB();
+      UI.modal = null;
+      break;
+    }
+    case "openLogMeal":
+      UI.modal = { type: "logMeal", query: "", picks: {} };
+      break;
+    case "saveLogMeal": {
+      const date = todayStr();
+      Object.entries(UI.modal.picks).forEach(([foodId, servingsRaw]) => {
+        const servings = Number(servingsRaw) || 0;
+        if (servings <= 0) return;
+        const f = DB.nutrition.foods.find(x => x.id === foodId);
+        if (!f) return;
+        DB.nutrition.logs.push({
+          id: uid(), date, foodId: f.id, foodName: f.name, servings,
+          calories: Math.round(f.calories * servings), protein: Math.round(f.protein * servings),
+          carbs: Math.round(f.carbs * servings), fat: Math.round(f.fat * servings),
+        });
+      });
+      saveDB();
+      UI.modal = null;
+      break;
+    }
+    case "openBulkAdd":
+      UI.modal = { type: "bulkAddFoods" };
+      break;
+    case "saveBulkAdd": {
+      const text = document.getElementById("bulk-text").value;
+      const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+      let added = 0, failed = [];
+      lines.forEach(line => {
+        const parts = line.split(",").map(p => p.trim());
+        if (parts.length < 5) { failed.push(line); return; }
+        const [name, cal, pro, carb, fat] = parts;
+        if (!name || isNaN(Number(cal))) { failed.push(line); return; }
+        DB.nutrition.foods.push({
+          id: uid(), name, calories: Number(cal) || 0, protein: Number(pro) || 0,
+          carbs: Number(carb) || 0, fat: Number(fat) || 0,
+        });
+        added++;
+      });
+      if (added > 0) saveDB();
+      if (failed.length > 0) {
+        UI.modal = { type: "bulkAddFoods", status: `Added ${added}. Couldn't parse ${failed.length} line(s) — check the format.`, text };
+      } else {
+        UI.modal = null;
+      }
+      break;
+    }
+    case "openSearchFood":
+      UI.modal = { type: "searchFood", query: "", results: [], loading: false, searched: false };
+      break;
+    case "openSearchFoodFromDb":
+      UI.modal = { type: "searchFood", query: UI.foodDbQuery || "", results: [], loading: false, searched: false };
+      break;
+    case "addSearchResult": {
+      const r = UI.modal.results[Number(el.dataset.idx)];
+      if (r) {
+        DB.nutrition.foods.push({ id: uid(), name: r.brand ? `${r.name} (${r.brand})` : r.name, calories: r.calories, protein: r.protein, carbs: r.carbs, fat: r.fat });
+        saveDB();
+      }
+      break;
+    }
+    case "exportBackup": {
+      const payload = { workout: DB.workout, nutrition: DB.nutrition, exportedAt: new Date().toISOString() };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `train-fuel-backup-${todayStr()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      const status = document.getElementById("backup-status");
+      if (status) status.textContent = "Backup downloaded.";
+      break;
+    }
+    case "triggerImport":
+      document.getElementById("import-file-input").click();
+      return; // no render needed, handled by file input change listener
+    case "closeModal":
+      UI.modal = null;
+      break;
+  }
+  render();
+  attachFieldListeners();
+}
+
+function attachFieldListeners() {
+  // Live-update fields inside modals that need to reflect into UI.modal state
+  const setFieldEls = document.querySelectorAll('[data-action="setField"]');
+  setFieldEls.forEach(elm => {
+    elm.oninput = () => {
+      const idx = Number(elm.dataset.idx), field = elm.dataset.field;
+      UI.modal.sets[idx][field] = elm.value;
+    };
+  });
+  const servingsEl = document.querySelector('[data-action="updateServings"]');
+  if (servingsEl) {
+    servingsEl.oninput = () => {
+      UI.modal.servings = servingsEl.value;
+      render();
+      attachFieldListeners();
+      const el2 = document.getElementById("f-servings");
+      if (el2) el2.focus(); // no selectionStart/End here — number inputs throw on that in some browsers
+    };
+  }
+  const mealSearchEl = document.querySelector('[data-action="mealSearch"]');
+  if (mealSearchEl) {
+    mealSearchEl.oninput = () => {
+      UI.modal.query = mealSearchEl.value;
+      render();
+      attachFieldListeners();
+      const el2 = document.getElementById("meal-search");
+      if (el2) { el2.focus(); el2.selectionStart = el2.selectionEnd = el2.value.length; }
+    };
+  }
+  document.querySelectorAll('[data-action="mealPick"]').forEach(elm => {
+    elm.oninput = () => {
+      UI.modal.picks[elm.dataset.id] = elm.value;
+      const btn = document.querySelector('[data-action="saveLogMeal"]');
+      if (btn) btn.disabled = !Object.values(UI.modal.picks).some(v => Number(v) > 0);
+    };
+  });
+  const foodDbSearchInput = document.getElementById("food-db-search");
+  if (foodDbSearchInput) {
+    foodDbSearchInput.oninput = () => {
+      UI.foodDbQuery = foodDbSearchInput.value;
+      render();
+      attachFieldListeners();
+      const el2 = document.getElementById("food-db-search");
+      if (el2) { el2.focus(); el2.selectionStart = el2.selectionEnd = el2.value.length; }
+    };
+  }
+  const historyDateInput = document.getElementById("history-date-input");
+  if (historyDateInput) {
+    historyDateInput.onchange = () => {
+      UI.historyDate = historyDateInput.value;
+      render();
+      attachFieldListeners();
+    };
+  }
+  const searchInput = document.getElementById("search-food-input");
+  if (searchInput) {
+    searchInput.oninput = () => { UI.modal.query = searchInput.value; };
+    searchInput.onkeydown = (e) => { if (e.key === "Enter") runFoodSearch(); };
+  }
+  const importInput = document.getElementById("import-file-input");
+  if (importInput) {
+    importInput.onchange = (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const status = document.getElementById("backup-status");
+        try {
+          const parsed = JSON.parse(reader.result);
+          if (parsed.workout) DB.workout = Object.assign({ exercises: SEED_EXERCISES, sessions: [], currentDay: 1, dayLog: [] }, parsed.workout);
+          if (parsed.nutrition) DB.nutrition = Object.assign({ foods: [], logs: [], targets: { calories: 3100, protein: 180, carbs: 400, fat: 85 } }, parsed.nutrition);
+          saveDB();
+          UI.viewDay = DB.workout.currentDay;
+          render();
+          attachFieldListeners();
+          const s = document.getElementById("backup-status");
+          if (s) s.textContent = "Restored from backup.";
+        } catch (err) {
+          if (status) status.textContent = "Couldn't read that file — make sure it's a backup exported from this app.";
+        }
+      };
+      reader.readAsText(file);
+    };
+  }
+}
+
+document.addEventListener("click", (e) => {
+  // Never let a click that lands on a form field trigger delegation — including
+  // walking up to an ancestor's data-action (e.g. a modal backdrop's close action).
+  // Form fields are wired via their own oninput/onkeydown/onchange listeners.
+  if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") return;
+
+  // Close modal only when the backdrop itself is clicked directly (not a child of it)
+  if (e.target.classList && e.target.classList.contains("modal-backdrop")) {
+    UI.modal = null;
+    render();
+    attachFieldListeners();
+    return;
+  }
+  const el = e.target.closest("[data-action]");
+  if (!el) return;
+  if (el.dataset.action === "runFoodSearch") {
+    runFoodSearch();
+    return;
+  }
+  if (el.dataset.action === "openSearchFoodFromDb") {
+    handleAction(el.dataset.action, el);
+    runFoodSearch();
+    return;
+  }
+  handleAction(el.dataset.action, el);
+});
+
+async function runFoodSearch() {
+  const input = document.getElementById("search-food-input");
+  const query = input ? input.value.trim() : (UI.modal.query || "");
+  if (!query) return;
+  UI.modal = { type: "searchFood", query, results: [], loading: true, searched: false };
+  render();
+  attachFieldListeners();
+  try {
+    const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&json=1&page_size=10&fields=product_name,brands,nutriments`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Network response was not ok");
+    const data = await res.json();
+    const products = (data.products || []);
+    const results = products
+      .filter(p => p.product_name && p.nutriments && p.nutriments["energy-kcal_100g"] != null)
+      .map(p => ({
+        name: p.product_name,
+        brand: p.brands ? p.brands.split(",")[0].trim() : "",
+        calories: Math.round(p.nutriments["energy-kcal_100g"] || 0),
+        protein: Math.round((p.nutriments["proteins_100g"] || 0) * 10) / 10,
+        carbs: Math.round((p.nutriments["carbohydrates_100g"] || 0) * 10) / 10,
+        fat: Math.round((p.nutriments["fat_100g"] || 0) * 10) / 10,
+      }))
+      .slice(0, 8);
+    UI.modal = { type: "searchFood", query, results, loading: false, searched: true };
+  } catch (err) {
+    UI.modal = { type: "searchFood", query, results: [], loading: false, searched: true, error: "Couldn't reach the food database — check your connection and try again." };
+  }
+  render();
+  attachFieldListeners();
+}
+
+render();
+attachFieldListeners();
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {
+      // Non-fatal: app still works without the service worker, just without
+      // the install prompt / offline caching benefits.
+    });
+  });
+}
+</script>
+</body>
+</html>
