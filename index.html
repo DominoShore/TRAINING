@@ -78,6 +78,8 @@
   .plate { background: var(--surface-alt); border: 2px solid var(--accent-dim); border-radius: 50%; width: 52px; height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; }
   .plate .w { font-size: 13px; font-weight: 700; color: var(--accent); line-height: 1; }
   .plate .r { font-size: 9px; color: var(--text-dim); margin-top: 1px; }
+  .plate-target { border-style: dashed; border-color: var(--border); opacity: 0.7; }
+  .plate-target .w { color: var(--text-dim); }
 
   .list-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
   .list-item:last-child { border-bottom: none; }
@@ -155,6 +157,7 @@ const SEED_FOODS = [
 ];
 
 function uid() { return Math.random().toString(36).slice(2, 10); }
+const VOICE_SUPPORTED = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 function fmtDate(d) {
   const dt = new Date(d + "T00:00:00");
@@ -164,22 +167,43 @@ function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// Mifflin-St Jeor BMR, scaled by activity, adjusted for goal. Same formula used
+// conversationally earlier in this app's development — now available in-app.
+function calcTargetsFromStats(weightKg, heightCm, age, sex, activityMultiplier, goal) {
+  const bmr = sex === "male"
+    ? 10 * weightKg + 6.25 * heightCm - 5 * age + 5
+    : 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
+  const tdee = bmr * activityMultiplier;
+  let calories;
+  if (goal === "cut") calories = tdee - 500;
+  else if (goal === "bulk") calories = tdee + 300;
+  else calories = tdee; // maintain / recomp
+  calories = Math.round(calories);
+  const protein = Math.round(weightKg * 2.2);
+  const fat = Math.round((calories * 0.25) / 9);
+  const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
+  return { calories, protein, carbs, fat };
+}
+
 // ---------- Persistence ----------
 const STORAGE_KEY = "trainFuelData_v1";
+const IS_FRESH_INSTALL = !localStorage.getItem(STORAGE_KEY);
 function loadDB() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
-        workout: Object.assign({ exercises: SEED_EXERCISES, sessions: [], currentDay: 1, dayLog: [] }, parsed.workout || {}),
-        nutrition: Object.assign({ foods: [], logs: [], targets: { calories: 3100, protein: 180, carbs: 400, fat: 85 } }, parsed.nutrition || {}),
+        workout: Object.assign({ exercises: [], sessions: [], currentDay: 1, dayLog: [], seededExerciseNames: [] }, parsed.workout || {}),
+        nutrition: Object.assign({ foods: [], logs: [], seededFoodNames: [], savedMeals: [], targets: { calories: 2200, protein: 150, carbs: 220, fat: 70 } }, parsed.nutrition || {}),
       };
     }
   } catch (e) { console.error("load failed", e); }
   return {
-    workout: { exercises: SEED_EXERCISES, sessions: [], currentDay: 1, dayLog: [] },
-    nutrition: { foods: [], logs: [], targets: { calories: 3100, protein: 180, carbs: 400, fat: 85 } },
+    // Truly fresh installs start empty — the setup wizard explicitly decides
+    // whether to merge in the example exercises/foods via "Load Example Data".
+    workout: { exercises: [], sessions: [], currentDay: 1, dayLog: [], seededExerciseNames: [] },
+    nutrition: { foods: [], logs: [], seededFoodNames: [], savedMeals: [], targets: { calories: 2200, protein: 150, carbs: 220, fat: 70 } },
   };
 }
 function saveDB() {
@@ -188,21 +212,62 @@ function saveDB() {
 }
 
 function mergeSeedFoods(db) {
+  if (!db.nutrition.seededFoodNames) db.nutrition.seededFoodNames = [];
+  const alreadyHandled = new Set(db.nutrition.seededFoodNames.map(n => n.trim().toLowerCase()));
   const existingNames = new Set(db.nutrition.foods.map(f => f.name.trim().toLowerCase()));
-  let added = false;
+  let changed = false;
   SEED_FOODS.forEach(f => {
-    if (!existingNames.has(f.name.trim().toLowerCase())) {
+    const key = f.name.trim().toLowerCase();
+    if (alreadyHandled.has(key)) return; // seen before — present or deliberately deleted, either way leave it alone
+    if (!existingNames.has(key)) {
       db.nutrition.foods.push({ id: uid(), ...f });
-      existingNames.add(f.name.trim().toLowerCase());
-      added = true;
+      existingNames.add(key);
     }
+    db.nutrition.seededFoodNames.push(f.name);
+    alreadyHandled.add(key);
+    changed = true;
   });
-  return added;
+  return changed;
+}
+
+function mergeSeedExercises(db) {
+  if (!db.workout.seededExerciseNames) db.workout.seededExerciseNames = [];
+  const alreadyHandled = new Set(db.workout.seededExerciseNames.map(n => n.trim().toLowerCase()));
+  const existingNames = new Set(db.workout.exercises.map(e => e.name.trim().toLowerCase()));
+  let changed = false;
+  SEED_EXERCISES.forEach(e => {
+    const key = e.name.trim().toLowerCase();
+    if (alreadyHandled.has(key)) return; // seen before — present or deliberately deleted, either way leave it alone
+    if (!existingNames.has(key)) {
+      db.workout.exercises.push({ id: uid(), name: e.name, day: e.day, target: e.target });
+      existingNames.add(key);
+    }
+    db.workout.seededExerciseNames.push(e.name);
+    alreadyHandled.add(key);
+    changed = true;
+  });
+  return changed;
+}
+
+// Mark every current seed item as "already handled" without adding it — used when
+// someone chooses to start with an empty setup, so future code updates (which still
+// carry the example exercises/foods for the "Load Example Data" option) never get
+// silently merged into a from-scratch setup.
+function markAllSeedsHandledWithoutAdding(db) {
+  db.workout.seededExerciseNames = SEED_EXERCISES.map(e => e.name);
+  db.nutrition.seededFoodNames = SEED_FOODS.map(f => f.name);
 }
 
 let DB = loadDB();
-if (mergeSeedFoods(DB)) saveDB();
-let UI = { tab: "today", viewDay: DB.workout.currentDay || 1, modal: null, historyDate: todayStr() };
+if (!IS_FRESH_INSTALL) {
+  // Existing user on this device: behave exactly as before, auto-merging any newly
+  // added example content. Fresh installs go through the setup wizard instead.
+  let seedChanged = false;
+  if (mergeSeedFoods(DB)) seedChanged = true;
+  if (mergeSeedExercises(DB)) seedChanged = true;
+  if (seedChanged) saveDB();
+}
+let UI = { tab: "train", viewDay: DB.workout.currentDay || 1, modal: null, historyDate: todayStr(), setupStep: IS_FRESH_INSTALL ? "choice" : null };
 
 // ---------- Derived helpers ----------
 function todaysSets() { const t = todayStr(); return DB.workout.sessions.filter(s => s.date === t); }
@@ -242,23 +307,37 @@ function allActivityDates() {
 
 // ---------- Render ----------
 function render() {
+  const scrollPos = window.scrollY;
   const app = document.getElementById("app");
+  if (UI.setupStep) {
+    app.innerHTML = `<div class="shell">${renderSetupWizard()}</div>`;
+    window.scrollTo(0, scrollPos);
+    return;
+  }
+  const pageContent =
+    UI.tab === "train" ? renderTrainPage() :
+    UI.tab === "food" ? renderFoodPage() :
+    UI.tab === "account" ? renderAccountPage() :
+    renderHistory();
   app.innerHTML = `
     <div class="shell">
       <div class="top">
         <h1>Train / Fuel</h1>
         <div class="date">${fmtDate(todayStr())}</div>
       </div>
-      ${UI.tab === "today" ? renderToday() : renderHistory()}
+      ${pageContent}
     </div>
     <div class="tabbar">
       <div class="tabbar-inner">
-        <button class="tab-btn ${UI.tab === "today" ? "active" : ""}" data-action="tab" data-tab="today">Today</button>
+        <button class="tab-btn ${UI.tab === "train" ? "active" : ""}" data-action="tab" data-tab="train">Train</button>
+        <button class="tab-btn ${UI.tab === "food" ? "active fuel-active" : ""}" data-action="tab" data-tab="food">Food</button>
+        <button class="tab-btn ${UI.tab === "account" ? "active" : ""}" data-action="tab" data-tab="account">Account</button>
         <button class="tab-btn ${UI.tab === "history" ? "active fuel-active" : ""}" data-action="tab" data-tab="history">History</button>
       </div>
     </div>
     ${renderModal()}
   `;
+  window.scrollTo(0, scrollPos);
 }
 
 function macroGauges(totals, targets) {
@@ -280,7 +359,76 @@ function macroGauges(totals, targets) {
   }).join("");
 }
 
-function renderToday() {
+function renderSetupWizard() {
+  if (UI.setupStep === "choice") {
+    return `
+      <div class="top"><h1>Train / Fuel</h1></div>
+      <div class="card">
+        <h2>Welcome</h2>
+        <div style="font-size:14px;margin-bottom:16px;line-height:1.5;">
+          Set up your own training days, foods, and targets — or start from a filled-in example to see how it works, then edit freely.
+        </div>
+        <button class="action" style="width:100%;justify-content:center;margin-bottom:10px;padding:14px;" data-action="chooseFreshStart">Start With My Own Setup</button>
+        <button class="action ghost" style="width:100%;justify-content:center;padding:14px;" data-action="chooseExampleData">Load Example Data First</button>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:10px;">Example data can be edited or removed at any time afterward — nothing is locked in.</div>
+      </div>`;
+  }
+  if (UI.setupStep === "targets") {
+    const f = UI.setupForm || {};
+    const result = UI.setupTargetsResult;
+    return `
+      <div class="top"><h1>Train / Fuel</h1></div>
+      <div class="card">
+        <h2>Set Your Daily Targets</h2>
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;">
+          Optional — calculate a starting point from your stats, or skip and set numbers manually later via Edit Targets.
+        </div>
+        <div class="row">
+          <label class="field">Weight (kg)<input id="su-weight" type="number" value="${f.weight || ""}" /></label>
+          <label class="field">Height (cm)<input id="su-height" type="number" value="${f.height || ""}" /></label>
+        </div>
+        <div class="row">
+          <label class="field">Age<input id="su-age" type="number" value="${f.age || ""}" /></label>
+          <label class="field">Sex
+            <select id="su-sex">
+              <option value="male" ${f.sex === "male" ? "selected" : ""}>Male</option>
+              <option value="female" ${f.sex === "female" ? "selected" : ""}>Female</option>
+            </select>
+          </label>
+        </div>
+        <label class="field">Activity level
+          <select id="su-activity">
+            <option value="1.375" ${f.activity === "1.375" ? "selected" : ""}>Light (1-2 sessions/week)</option>
+            <option value="1.55" ${!f.activity || f.activity === "1.55" ? "selected" : ""}>Moderate (3-5 sessions/week)</option>
+            <option value="1.725" ${f.activity === "1.725" ? "selected" : ""}>High (6+ sessions/week)</option>
+          </select>
+        </label>
+        <label class="field">Goal
+          <select id="su-goal">
+            <option value="cut" ${f.goal === "cut" ? "selected" : ""}>Fat loss</option>
+            <option value="maintain" ${!f.goal || f.goal === "maintain" ? "selected" : ""}>Maintain / recomp</option>
+            <option value="bulk" ${f.goal === "bulk" ? "selected" : ""}>Build muscle</option>
+          </select>
+        </label>
+        <button class="action fuel" style="width:100%;justify-content:center;margin-top:8px;" data-action="calcSetupTargets">Calculate</button>
+        ${result ? `
+          <div class="card" style="margin-top:14px;background:var(--surface-alt);">
+            <div class="mono" style="font-size:13px;line-height:1.8;">
+              Calories: ${result.calories}<br/>
+              Protein: ${result.protein}g<br/>
+              Carbs: ${result.carbs}g<br/>
+              Fat: ${result.fat}g
+            </div>
+          </div>
+          <button class="action" style="width:100%;justify-content:center;margin-top:10px;padding:14px;" data-action="useCalculatedTargets">Use These Targets</button>
+        ` : ""}
+        <button class="action ghost" style="width:100%;justify-content:center;margin-top:10px;padding:14px;" data-action="skipTargetsSetup">Skip — I'll set targets manually later</button>
+      </div>`;
+  }
+  return "";
+}
+
+function renderTrainPage() {
   const viewDay = UI.viewDay;
   const dayExercises = DB.workout.exercises.filter(e => e.day === viewDay);
   const isNextDay = viewDay === DB.workout.currentDay;
@@ -293,9 +441,34 @@ function renderToday() {
       ${DB.workout.currentDay === d.day ? '<span class="day-dot"></span>' : ""}
     </button>`).join("");
 
+  const today = todayStr();
   const exerciseRows = dayExercises.map(ex => {
-    const hist = historyFor(ex.id);
-    const last = hist[hist.length - 1];
+    const hist = historyFor(ex.id); // ascending by date
+    const priorSessions = hist.filter(s => s.date !== today);
+    const todaySessions = hist.filter(s => s.date === today);
+    const target = priorSessions[priorSessions.length - 1]; // most recent non-today session
+    const todayEntry = todaySessions[todaySessions.length - 1]; // latest of today's logs, if any
+
+    let historyBlock;
+    if (!target && !todayEntry) {
+      historyBlock = `<div style="font-size:11px;color:var(--text-dim);margin-top:4px;">No history yet — this'll set the baseline.</div>`;
+    } else {
+      historyBlock = `<div style="margin-top:8px;">`;
+      if (target) {
+        historyBlock += `
+          <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;">Target — ${fmtDate(target.date)}</div>
+          <div class="plate-strip plate-strip-target">${target.sets.map(s => `<div class="plate plate-target"><div class="w">${s.weight}</div><div class="r">×${s.reps}</div></div>`).join("")}</div>`;
+      }
+      if (todayEntry) {
+        historyBlock += `
+          <div style="font-size:11px;color:var(--accent);margin:${target ? "10px" : "0"} 0 4px;">● Today</div>
+          <div class="plate-strip">${todayEntry.sets.map(s => `<div class="plate"><div class="w">${s.weight}</div><div class="r">×${s.reps}</div></div>`).join("")}</div>`;
+      } else if (target) {
+        historyBlock += `<div style="font-size:11px;color:var(--text-dim);margin-top:8px;">Not logged today yet — match or beat the target above.</div>`;
+      }
+      historyBlock += `</div>`;
+    }
+
     return `
       <div style="border-bottom:1px solid var(--border);padding:10px 0;">
         <div class="list-item" style="border-bottom:none;padding:0;">
@@ -303,19 +476,27 @@ function renderToday() {
             <div style="font-weight:600;">${escapeHtml(ex.name)}</div>
             ${ex.target ? `<span class="mono" style="font-size:11px;color:var(--text-dim);">target ${escapeHtml(ex.target)}</span>` : ""}
           </div>
-          <div style="display:flex;gap:6px;">
-            <button class="action" style="font-size:11px;padding:6px 10px;background:${DAY_COLOR[ex.day]};" data-action="openLogSets" data-id="${ex.id}">+ Log</button>
-            <button class="icon-btn" data-action="deleteExercise" data-id="${ex.id}">✕</button>
-          </div>
+          <button class="action" style="font-size:11px;padding:6px 10px;background:${DAY_COLOR[ex.day]};" data-action="openLogSets" data-id="${ex.id}">+ Log</button>
         </div>
-        ${last ? `
-          <div style="margin-top:8px;">
-            <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;">Match or beat — ${fmtDate(last.date)}</div>
-            <div class="plate-strip">${last.sets.map(s => `<div class="plate"><div class="w">${s.weight}</div><div class="r">×${s.reps}</div></div>`).join("")}</div>
-          </div>` : `<div style="font-size:11px;color:var(--text-dim);margin-top:4px;">No history yet — this'll set the baseline.</div>`}
+        ${historyBlock}
       </div>`;
   }).join("");
 
+  return `
+    <div class="card">
+      <h2>Training</h2>
+      <div class="row" style="margin-bottom:12px;gap:6px;">${dayButtons}</div>
+      ${isNextDay
+        ? `<div class="mono" style="font-size:11px;color:var(--accent);margin-bottom:10px;">● This is your next day up</div>`
+        : `<div class="mono" style="font-size:11px;color:var(--text-dim);margin-bottom:10px;">Viewing Day ${viewDay} — next up is Day ${DB.workout.currentDay}</div>`}
+      ${lastDayDone ? `<div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;">Last done: ${fmtDate(lastDayDone.date)}</div>` : ""}
+      ${dayExercises.length === 0 ? `<div class="empty">No exercises on this day yet. Add some from the Account tab.</div>` : exerciseRows}
+    </div>
+    ${dayExercises.length > 0 ? `<button class="action" style="width:100%;justify-content:center;padding:13px 14px;margin-bottom:14px;" data-action="markDayComplete">Mark Day ${viewDay} Complete → Next: Day ${viewDay === 4 ? 1 : viewDay + 1}</button>` : ""}
+  `;
+}
+
+function renderFoodPage() {
   const logs = todaysLogs(), totals = todaysTotals();
   const logRows = logs.map(l => `
     <div class="list-item">
@@ -326,6 +507,44 @@ function renderToday() {
       <button class="icon-btn" data-action="deleteLog" data-id="${l.id}">✕</button>
     </div>`).join("");
 
+  const savedMeals = DB.nutrition.savedMeals || [];
+  const savedMealRows = savedMeals.map(meal => {
+    const items = meal.items
+      .map(it => DB.nutrition.foods.find(f => f.id === it.foodId))
+      .filter(Boolean);
+    const totalCal = meal.items.reduce((sum, it) => {
+      const f = DB.nutrition.foods.find(x => x.id === it.foodId);
+      return sum + (f ? Math.round(f.calories * it.servings) : 0);
+    }, 0);
+    return `
+      <div class="list-item">
+        <button style="flex:1;text-align:left;background:none;border:none;color:var(--text);cursor:pointer;padding:0;" data-action="quickLogSavedMeal" data-id="${meal.id}">
+          <div style="font-weight:600;">🍽️ ${escapeHtml(meal.name)}</div>
+          <div class="mono" style="font-size:11px;color:var(--text-dim);">${items.length} item${items.length === 1 ? "" : "s"} · ~${totalCal} kcal · tap to log</div>
+        </button>
+        <button class="icon-btn" data-action="deleteSavedMeal" data-id="${meal.id}">✕</button>
+      </div>`;
+  }).join("");
+
+  return `
+    <div class="card">
+      <h2>Today's Fuel</h2>
+      ${macroGauges(totals, DB.nutrition.targets)}
+    </div>
+    ${savedMeals.length > 0 ? `
+    <div class="card">
+      <h2>Saved Meals</h2>
+      ${savedMealRows}
+    </div>` : ""}
+    <div class="card">
+      <h2>Today's Log</h2>
+      ${logs.length === 0 ? `<div class="empty">Nothing logged yet — add what you've eaten below.</div>` : logRows}
+      <button class="action fuel" style="margin-top:12px;" data-action="openLogMeal">+ Log a Meal</button>
+    </div>
+  `;
+}
+
+function renderAccountPage() {
   const foodDbQuery = (UI.foodDbQuery || "").trim().toLowerCase();
   const filteredFoods = foodDbQuery
     ? DB.nutrition.foods.filter(f => f.name.toLowerCase().includes(foodDbQuery))
@@ -342,29 +561,43 @@ function renderToday() {
       </div>
     </div>`).join("");
 
+  const exercisesByDay = DAYS.map(d => {
+    const exs = DB.workout.exercises.filter(e => e.day === d.day);
+    const rows = exs.map(ex => `
+      <div class="list-item">
+        <div>
+          <div style="font-weight:600;">${escapeHtml(ex.name)}</div>
+          ${ex.target ? `<span class="mono" style="font-size:11px;color:var(--text-dim);">target ${escapeHtml(ex.target)}</span>` : ""}
+        </div>
+        <button class="icon-btn" data-action="deleteExercise" data-id="${ex.id}">✕</button>
+      </div>`).join("");
+    return `
+      <div style="margin-bottom:14px;">
+        <div class="mono" style="font-size:11px;color:${DAY_COLOR[d.day]};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Day ${d.day} — ${d.muscle}</div>
+        ${exs.length === 0 ? `<div class="empty" style="padding:8px;">No exercises yet.</div>` : rows}
+      </div>`;
+  }).join("");
+
+  const t = DB.nutrition.targets;
+
   return `
     <div class="card">
-      <h2>Training</h2>
-      <div class="row" style="margin-bottom:12px;gap:6px;">${dayButtons}</div>
-      ${isNextDay
-        ? `<div class="mono" style="font-size:11px;color:var(--accent);margin-bottom:10px;">● This is your next day up</div>`
-        : `<div class="mono" style="font-size:11px;color:var(--text-dim);margin-bottom:10px;">Viewing Day ${viewDay} — next up is Day ${DB.workout.currentDay}</div>`}
-      ${lastDayDone ? `<div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;">Last done: ${fmtDate(lastDayDone.date)}</div>` : ""}
-      ${dayExercises.length === 0 ? `<div class="empty">No exercises on this day yet. Add some below.</div>` : exerciseRows}
-      <button class="action ghost" style="margin-top:12px;" data-action="openAddExercise">+ Add Exercise to Day ${viewDay}</button>
+      <h2>Daily Targets</h2>
+      <div class="mono" style="font-size:13px;line-height:1.8;margin-bottom:12px;">
+        Calories: ${t.calories}<br/>
+        Protein: ${t.protein}g<br/>
+        Carbs: ${t.carbs}g<br/>
+        Fat: ${t.fat}g
+      </div>
+      <button class="action ghost" data-action="openTargets">Edit Targets</button>
     </div>
-    ${dayExercises.length > 0 ? `<button class="action" style="width:100%;justify-content:center;padding:13px 14px;margin-bottom:14px;" data-action="markDayComplete">Mark Day ${viewDay} Complete → Next: Day ${viewDay === 4 ? 1 : viewDay + 1}</button>` : ""}
 
     <div class="card">
-      <h2>Today's Fuel</h2>
-      ${macroGauges(totals, DB.nutrition.targets)}
-      <button class="action ghost" style="margin-top:4px;font-size:11px;padding:6px 10px;" data-action="openTargets">Edit Targets</button>
+      <h2>Exercise Library</h2>
+      ${exercisesByDay}
+      <button class="action ghost" style="width:100%;justify-content:center;" data-action="openAddExercise">+ Add Exercise</button>
     </div>
-    <div class="card">
-      <h2>Today's Log</h2>
-      ${logs.length === 0 ? `<div class="empty">Nothing logged yet — add what you've eaten below.</div>` : logRows}
-      <button class="action fuel" style="margin-top:12px;" data-action="openLogMeal">+ Log a Meal</button>
-    </div>
+
     <div class="card">
       <h2>Food Database</h2>
       <label class="field">Search your foods
@@ -382,6 +615,7 @@ function renderToday() {
         <button class="action ghost" data-action="openBulkAdd">Paste Multiple</button>
       </div>
     </div>
+
     <div class="card">
       <h2>Backup &amp; Restore</h2>
       <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">
@@ -542,10 +776,11 @@ function renderModal() {
     const anyChecked = Object.values(m.picks).some(v => Number(v) > 0);
     const rows = foods.map(f => {
       const val = m.picks[f.id] || "";
+      const wasVoiceMatched = m.voiceMatchedIds && m.voiceMatchedIds.includes(f.id);
       return `
-        <div class="row" style="align-items:flex-end;margin-bottom:8px;">
+        <div class="row" style="align-items:flex-end;margin-bottom:8px;${wasVoiceMatched ? "background:rgba(232,185,63,0.08);border-radius:4px;padding:4px;" : ""}">
           <div style="flex:2;">
-            <div style="font-weight:600;font-size:13px;">${escapeHtml(f.name)}</div>
+            <div style="font-weight:600;font-size:13px;">${escapeHtml(f.name)}${wasVoiceMatched ? ' <span class="mono" style="color:var(--accent);font-size:10px;">● heard</span>' : ""}</div>
             <div class="mono" style="font-size:10px;color:var(--text-dim);">${f.calories} kcal/serving</div>
           </div>
           <label class="field" style="flex:1;margin-bottom:0;">Servings
@@ -557,9 +792,19 @@ function renderModal() {
       <div class="modal-backdrop" data-action="closeModal">
         <div class="modal fuel-modal">
           <div class="modal-head"><h3>Log a Meal</h3><button class="icon-btn" data-action="closeModal">✕</button></div>
-          <label class="field">Search foods<input id="meal-search" placeholder="type to filter…" value="${escapeHtml(m.query || "")}" data-action="mealSearch" autofocus /></label>
+          <div class="row" style="margin-bottom:10px;">
+            <label class="field" style="margin-bottom:0;">Search foods<input id="meal-search" placeholder="type to filter…" value="${escapeHtml(m.query || "")}" data-action="mealSearch" /></label>
+            ${VOICE_SUPPORTED ? `<button class="action ${m.listening ? "fuel" : "ghost"}" style="flex:0 0 auto;align-self:flex-end;" data-action="startVoiceLog">${m.listening ? "🎤 Listening…" : "🎤 Voice"}</button>` : ""}
+          </div>
+          ${!VOICE_SUPPORTED ? `<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;">Tip: tap the search box, then use your keyboard's dictation mic to search by voice.</div>` : ""}
+          ${m.voiceTranscript ? `<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">Heard: "${escapeHtml(m.voiceTranscript)}"</div>` : ""}
+          ${m.voiceUnmatched && m.voiceUnmatched.length > 0 ? `<div style="font-size:12px;color:var(--danger);margin-bottom:10px;">Couldn't match: ${m.voiceUnmatched.map(escapeHtml).join(", ")} — add these manually below if needed.</div>` : ""}
+          ${m.voiceError ? `<div style="font-size:12px;color:var(--danger);margin-bottom:10px;">${escapeHtml(m.voiceError)}</div>` : ""}
           ${foods.length === 0 ? `<div class="empty">No foods match. Add foods to your database first.</div>` : rows}
-          <button class="action fuel" style="margin-top:10px;" data-action="saveLogMeal" ${anyChecked ? "" : "disabled"}>Log Meal</button>
+          <div class="row" style="margin-top:10px;">
+            <button class="action fuel" data-action="saveLogMeal" ${anyChecked ? "" : "disabled"}>Log Meal</button>
+            <button class="action ghost" data-action="saveAsMeal" ${anyChecked ? "" : "disabled"}>💾 Save as Meal</button>
+          </div>
         </div>
       </div>`;
   }
@@ -615,9 +860,43 @@ Microwave rice (per 100g), 130, 2.7, 28, 0.3">${escapeHtml(m.text || "")}</texta
 // ---------- Actions ----------
 function handleAction(action, el) {
   switch (action) {
+    case "chooseFreshStart":
+      markAllSeedsHandledWithoutAdding(DB);
+      UI.setupStep = "targets";
+      break;
+    case "chooseExampleData": {
+      let seedChanged = false;
+      if (mergeSeedFoods(DB)) seedChanged = true;
+      if (mergeSeedExercises(DB)) seedChanged = true;
+      UI.viewDay = DB.workout.currentDay;
+      UI.setupStep = "targets";
+      break;
+    }
+    case "calcSetupTargets": {
+      const weight = Number(document.getElementById("su-weight").value);
+      const height = Number(document.getElementById("su-height").value);
+      const age = Number(document.getElementById("su-age").value);
+      const sex = document.getElementById("su-sex").value;
+      const activity = document.getElementById("su-activity").value;
+      const goal = document.getElementById("su-goal").value;
+      UI.setupForm = { weight, height, age, sex, activity, goal };
+      if (weight > 0 && height > 0 && age > 0) {
+        UI.setupTargetsResult = calcTargetsFromStats(weight, height, age, sex, Number(activity), goal);
+      }
+      break;
+    }
+    case "useCalculatedTargets":
+      DB.nutrition.targets = UI.setupTargetsResult;
+      saveDB();
+      UI.setupStep = null;
+      break;
+    case "skipTargetsSetup":
+      saveDB();
+      UI.setupStep = null;
+      break;
     case "tab":
       UI.tab = el.dataset.tab;
-      if (UI.tab === "today") UI.viewDay = DB.workout.currentDay;
+      if (UI.tab === "train") UI.viewDay = DB.workout.currentDay;
       if (UI.tab === "history" && !UI.historyDate) UI.historyDate = todayStr();
       break;
     case "setViewDay":
@@ -640,10 +919,13 @@ function handleAction(action, el) {
       }
       break;
     }
-    case "deleteExercise":
+    case "deleteExercise": {
+      const ex = DB.workout.exercises.find(e => e.id === el.dataset.id);
+      if (!ex || !confirm(`Remove "${ex.name}" from your training? Past logged sets stay in History, but you won't be able to log new sets against it unless you re-add it.`)) return;
       DB.workout.exercises = DB.workout.exercises.filter(e => e.id !== el.dataset.id);
       saveDB();
       break;
+    }
     case "openLogSets":
       UI.modal = { type: "logSets", exerciseId: el.dataset.id, sets: [{ weight: "", reps: "" }] };
       break;
@@ -686,10 +968,13 @@ function handleAction(action, el) {
       }
       break;
     }
-    case "deleteFood":
-      DB.nutrition.foods = DB.nutrition.foods.filter(f => f.id !== el.dataset.id);
+    case "deleteFood": {
+      const f = DB.nutrition.foods.find(x => x.id === el.dataset.id);
+      if (!f || !confirm(`Remove "${f.name}" from your food database? Past logged entries stay in History, but you'll need to re-add it to log it again.`)) return;
+      DB.nutrition.foods = DB.nutrition.foods.filter(x => x.id !== el.dataset.id);
       saveDB();
       break;
+    }
     case "openLogFood":
       UI.modal = { type: "logFood", foodId: el.dataset.id, servings: "1" };
       break;
@@ -726,7 +1011,7 @@ function handleAction(action, el) {
       break;
     }
     case "openLogMeal":
-      UI.modal = { type: "logMeal", query: "", picks: {} };
+      UI.modal = { type: "logMeal", query: "", picks: {}, listening: false, voiceTranscript: "", voiceUnmatched: [], voiceError: "" };
       break;
     case "saveLogMeal": {
       const date = todayStr();
@@ -743,6 +1028,41 @@ function handleAction(action, el) {
       });
       saveDB();
       UI.modal = null;
+      break;
+    }
+    case "saveAsMeal": {
+      const items = Object.entries(UI.modal.picks)
+        .filter(([, v]) => Number(v) > 0)
+        .map(([foodId, v]) => ({ foodId, servings: Number(v) }));
+      if (items.length === 0) return;
+      const name = prompt("Name this meal (e.g. Usual Breakfast):");
+      if (!name || !name.trim()) return;
+      if (!DB.nutrition.savedMeals) DB.nutrition.savedMeals = [];
+      DB.nutrition.savedMeals.push({ id: uid(), name: name.trim(), items });
+      saveDB();
+      break;
+    }
+    case "quickLogSavedMeal": {
+      const meal = DB.nutrition.savedMeals.find(m => m.id === el.dataset.id);
+      if (!meal) break;
+      const date = todayStr();
+      meal.items.forEach(item => {
+        const f = DB.nutrition.foods.find(x => x.id === item.foodId);
+        if (!f) return; // food may have been deleted since this meal was saved
+        DB.nutrition.logs.push({
+          id: uid(), date, foodId: f.id, foodName: f.name, servings: item.servings,
+          calories: Math.round(f.calories * item.servings), protein: Math.round(f.protein * item.servings),
+          carbs: Math.round(f.carbs * item.servings), fat: Math.round(f.fat * item.servings),
+        });
+      });
+      saveDB();
+      break;
+    }
+    case "deleteSavedMeal": {
+      const meal = DB.nutrition.savedMeals.find(m => m.id === el.dataset.id);
+      if (!meal || !confirm(`Remove saved meal "${meal.name}"? This won't affect anything already logged.`)) return;
+      DB.nutrition.savedMeals = DB.nutrition.savedMeals.filter(m => m.id !== el.dataset.id);
+      saveDB();
       break;
     }
     case "openBulkAdd":
@@ -809,6 +1129,7 @@ function handleAction(action, el) {
   }
   render();
   attachFieldListeners();
+  if (action === "tab") window.scrollTo(0, 0);
 }
 
 function attachFieldListeners() {
@@ -843,8 +1164,11 @@ function attachFieldListeners() {
   document.querySelectorAll('[data-action="mealPick"]').forEach(elm => {
     elm.oninput = () => {
       UI.modal.picks[elm.dataset.id] = elm.value;
+      const hasAny = Object.values(UI.modal.picks).some(v => Number(v) > 0);
       const btn = document.querySelector('[data-action="saveLogMeal"]');
-      if (btn) btn.disabled = !Object.values(UI.modal.picks).some(v => Number(v) > 0);
+      if (btn) btn.disabled = !hasAny;
+      const saveBtn = document.querySelector('[data-action="saveAsMeal"]');
+      if (saveBtn) saveBtn.disabled = !hasAny;
     };
   });
   const foodDbSearchInput = document.getElementById("food-db-search");
@@ -880,8 +1204,8 @@ function attachFieldListeners() {
         const status = document.getElementById("backup-status");
         try {
           const parsed = JSON.parse(reader.result);
-          if (parsed.workout) DB.workout = Object.assign({ exercises: SEED_EXERCISES, sessions: [], currentDay: 1, dayLog: [] }, parsed.workout);
-          if (parsed.nutrition) DB.nutrition = Object.assign({ foods: [], logs: [], targets: { calories: 3100, protein: 180, carbs: 400, fat: 85 } }, parsed.nutrition);
+          if (parsed.workout) DB.workout = Object.assign({ exercises: [], sessions: [], currentDay: 1, dayLog: [], seededExerciseNames: [] }, parsed.workout);
+          if (parsed.nutrition) DB.nutrition = Object.assign({ foods: [], logs: [], seededFoodNames: [], savedMeals: [], targets: { calories: 2200, protein: 150, carbs: 220, fat: 70 } }, parsed.nutrition);
           saveDB();
           UI.viewDay = DB.workout.currentDay;
           render();
@@ -921,8 +1245,90 @@ document.addEventListener("click", (e) => {
     runFoodSearch();
     return;
   }
+  if (el.dataset.action === "startVoiceLog") {
+    startVoiceLog();
+    return;
+  }
   handleAction(el.dataset.action, el);
 });
+
+function matchFoodSegment(segment) {
+  const words = segment.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 2);
+  let best = null, bestScore = 0;
+  DB.nutrition.foods.forEach(f => {
+    const fname = f.name.toLowerCase();
+    let score = 0;
+    words.forEach(w => { if (fname.includes(w)) score++; });
+    if (score > bestScore) { bestScore = score; best = f; }
+  });
+  return bestScore > 0 ? best : null;
+}
+
+function extractLeadingNumber(segment) {
+  const match = segment.match(/(\d+(\.\d+)?)/);
+  return match ? parseFloat(match[1]) : null;
+}
+
+function parseVoiceTranscript(transcript) {
+  const segments = transcript.split(/,|\band\b|\bwith\b|\bplus\b/i).map(s => s.trim()).filter(Boolean);
+  const matched = [];
+  const unmatched = [];
+  segments.forEach(seg => {
+    const food = matchFoodSegment(seg);
+    if (food) {
+      const num = extractLeadingNumber(seg);
+      matched.push({ foodId: food.id, servings: num || 1 });
+    } else {
+      unmatched.push(seg);
+    }
+  });
+  return { matched, unmatched };
+}
+
+function startVoiceLog() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    UI.modal.voiceError = "Voice input isn't supported in this browser. On iPhone, tap the microphone icon on your keyboard instead while typing in the search box above.";
+    render();
+    attachFieldListeners();
+    return;
+  }
+  const recognition = new SR();
+  recognition.lang = "en-GB";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  UI.modal.listening = true;
+  UI.modal.voiceError = "";
+  render();
+  attachFieldListeners();
+
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    const { matched, unmatched } = parseVoiceTranscript(transcript);
+    matched.forEach(m => { UI.modal.picks[m.foodId] = String(m.servings); });
+    UI.modal.voiceTranscript = transcript;
+    UI.modal.voiceUnmatched = unmatched;
+    UI.modal.voiceMatchedIds = matched.map(m => m.foodId);
+    UI.modal.listening = false;
+    render();
+    attachFieldListeners();
+  };
+  recognition.onerror = () => {
+    UI.modal.listening = false;
+    UI.modal.voiceError = "Didn't catch that — try again.";
+    render();
+    attachFieldListeners();
+  };
+  recognition.onend = () => {
+    if (UI.modal && UI.modal.listening) {
+      UI.modal.listening = false;
+      render();
+      attachFieldListeners();
+    }
+  };
+  recognition.start();
+}
 
 async function runFoodSearch() {
   const input = document.getElementById("search-food-input");
@@ -956,6 +1362,27 @@ async function runFoodSearch() {
   attachFieldListeners();
 }
 
+function checkVoiceLogParam() {
+  const params = new URLSearchParams(window.location.search);
+  const transcript = params.get("voicelog");
+  if (!transcript) return;
+
+  const { matched, unmatched } = parseVoiceTranscript(transcript);
+  UI.tab = "food";
+  UI.modal = {
+    type: "logMeal", query: "", picks: {}, listening: false,
+    voiceTranscript: transcript, voiceUnmatched: unmatched,
+    voiceMatchedIds: matched.map(m => m.foodId), voiceError: "",
+  };
+  matched.forEach(m => { UI.modal.picks[m.foodId] = String(m.servings); });
+
+  // Clean the URL so refreshing the page doesn't re-process the same voice log
+  window.history.replaceState({}, "", window.location.pathname);
+}
+
+render();
+attachFieldListeners();
+checkVoiceLogParam();
 render();
 attachFieldListeners();
 
