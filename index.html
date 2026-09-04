@@ -7,89 +7,98 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Train/Fuel">
-<meta name="theme-color" content="#141414">
+<meta name="theme-color" content="#F7F3E9">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>Train / Fuel</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Kalam:wght@400;700&display=swap');
 
   :root {
-    --bg: #141414;
-    --surface: #1D1C19;
-    --surface-alt: #262420;
-    --text: #F2EFE9;
-    --text-dim: #9C9890;
-    --accent: #E8B93F;
-    --accent-dim: #6b5c2c;
-    --fuel: #8FA35E;
-    --danger: #C1443C;
-    --border: #34322C;
+    --bg: #F7F3E9;
+    --surface: #FFFFFF;
+    --surface-alt: #EEE5D0;
+    --text: #2A3A5A;
+    --text-dim: #7A8AA0;
+    --accent: #2A3A5A;
+    --accent-dim: #B0A080;
+    --fuel: #B5622A;
+    --danger: #B31E23;
+    --border: #D8CBB0;
+    --paper-line: #C9DCE8;
+    --margin-rule: #E0A0A0;
   }
   * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0;
     background: var(--bg); color: var(--text);
-    font-family: 'Inter', sans-serif;
+    font-family: 'Lora', Georgia, serif;
     -webkit-tap-highlight-color: transparent;
   }
-  .display { font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 0.03em; }
-  .mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+  .display { font-family: 'Lora', Georgia, serif; font-weight: 600; }
+  .mono { font-family: 'Courier New', monospace; font-variant-numeric: tabular-nums; }
+  .handwritten { font-family: 'Kalam', cursive; }
 
   .shell { max-width: 720px; margin: 0 auto; padding: 20px 16px 90px; min-height: 100vh; }
-  .top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 18px; border-bottom: 2px solid var(--border); padding-bottom: 12px; }
-  .top h1 { font-size: 26px; margin: 0; font-weight: 700; font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 0.03em; }
-  .top .date { color: var(--text-dim); font-size: 13px; font-family: 'JetBrains Mono', monospace; }
+  .top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 18px; border-bottom: 1.5px solid var(--border); padding-bottom: 12px; }
+  .top h1 { font-size: 24px; margin: 0; font-weight: 600; font-family: 'Lora', Georgia, serif; }
+  .top .date { color: var(--text-dim); font-size: 12px; font-family: 'Lora', Georgia, serif; font-style: italic; }
 
-  .tabbar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 2px solid var(--border); display: flex; justify-content: center; z-index: 20; padding-bottom: env(safe-area-inset-bottom); }
+  .tabbar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg); border-top: 1.5px solid var(--border); display: flex; justify-content: center; z-index: 20; padding-bottom: env(safe-area-inset-bottom); }
   .tabbar-inner { max-width: 720px; width: 100%; display: flex; }
-  .tab-btn { flex: 1; background: none; border: none; color: var(--text-dim); display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px 12px; cursor: pointer; font-size: 11px; font-family: 'Oswald', sans-serif; letter-spacing: 0.05em; text-transform: uppercase; border-top: 2px solid transparent; }
-  .tab-btn.active { color: var(--accent); border-top-color: var(--accent); }
+  .tab-btn { flex: 1; background: none; border: none; color: var(--text-dim); display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 4px; cursor: pointer; font-size: 12px; font-family: 'Lora', Georgia, serif; border-top: 2px solid transparent; }
+  .tab-btn.active { color: var(--accent); border-top-color: var(--accent); font-weight: 600; }
   .tab-btn.active.fuel-active { color: var(--fuel); border-top-color: var(--fuel); }
 
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 16px; margin-bottom: 14px; }
-  .card h2 { font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 0.04em; font-size: 14px; color: var(--text-dim); margin: 0 0 12px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 3px; padding: 16px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(42,58,90,0.06); }
+  .card h2 { font-family: 'Lora', Georgia, serif; font-weight: 600; font-size: 15px; color: var(--text); margin: 0 0 12px; border-bottom: 1px solid var(--paper-line); padding-bottom: 8px; }
+
+  .card-journal { background-image: repeating-linear-gradient(var(--surface) 0px, var(--surface) 23px, var(--paper-line) 24px); position: relative; padding-left: 30px; }
+  .card-journal::before { content: ""; position: absolute; left: 22px; top: 0; bottom: 0; width: 1.5px; background: var(--margin-rule); }
+  .card-journal h2 { background: var(--surface); display: inline-block; padding-right: 10px; border-bottom: none; margin-bottom: 4px; }
 
   .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .stat-box { background: var(--surface-alt); border: 1px solid var(--border); border-radius: 4px; padding: 12px; }
-  .stat-box .num { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; }
-  .stat-box .lbl { color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+  .stat-box { background: var(--surface-alt); border: 1px solid var(--border); border-radius: 3px; padding: 12px; }
+  .stat-box .num { font-family: 'Courier New', monospace; font-size: 20px; font-weight: 700; }
+  .stat-box .lbl { color: var(--text-dim); font-size: 11px; margin-top: 2px; }
 
   .gauge-row { margin-bottom: 12px; }
   .gauge-head { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; color: var(--text-dim); }
-  .gauge-head .val { font-family: 'JetBrains Mono', monospace; color: var(--text); }
-  .gauge-track { height: 10px; background: var(--surface-alt); border: 1px solid var(--border); border-radius: 2px; overflow: hidden; }
+  .gauge-head .val { font-family: 'Courier New', monospace; color: var(--text); }
+  .gauge-track { height: 7px; background: var(--surface-alt); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
   .gauge-fill { height: 100%; transition: width 0.3s ease; }
 
-  button.action { background: var(--accent); color: #1a1a1a; border: none; font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; font-size: 13px; padding: 10px 14px; border-radius: 3px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  button.action { background: var(--accent); color: var(--bg); border: none; font-family: 'Lora', Georgia, serif; font-weight: 600; font-size: 13px; padding: 10px 14px; border-radius: 3px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
   button.action.fuel { background: var(--fuel); }
-  button.action.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  button.action.ghost { background: transparent; border: 1.5px solid var(--accent-dim); color: var(--text); }
   button.action:disabled { opacity: 0.4; }
-  button.icon-btn { background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 4px; display: flex; align-items: center; font-size: 16px; }
+  button.icon-btn { background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 4px; display: flex; align-items: center; font-size: 16px; font-family: 'Lora', serif; }
   button.icon-btn:active { color: var(--danger); }
 
-  input, select { background: var(--surface-alt); border: 1px solid var(--border); color: var(--text); border-radius: 3px; padding: 8px 10px; font-family: 'Inter', sans-serif; font-size: 13px; width: 100%; }
-  label.field { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 10px; }
+  input, select, textarea { background: var(--surface-alt); border: 1px solid var(--border); color: var(--text); border-radius: 3px; padding: 8px 10px; font-family: 'Lora', Georgia, serif; font-size: 13px; width: 100%; }
+  label.field { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-dim); margin-bottom: 10px; }
   .row { display: flex; gap: 8px; }
   .row > * { flex: 1; }
 
   .plate-strip { display: flex; flex-wrap: wrap; gap: 6px; }
-  .plate { background: var(--surface-alt); border: 2px solid var(--accent-dim); border-radius: 50%; width: 52px; height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; }
-  .plate .w { font-size: 13px; font-weight: 700; color: var(--accent); line-height: 1; }
-  .plate .r { font-size: 9px; color: var(--text-dim); margin-top: 1px; }
-  .plate-target { border-style: dashed; border-color: var(--border); opacity: 0.7; }
+  .plate { background: var(--surface-alt); border: 1.5px solid var(--accent-dim); border-radius: 3px; min-width: 46px; height: 40px; padding: 0 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'Courier New', monospace; }
+  .plate .w { font-size: 12px; font-weight: 700; color: var(--accent); line-height: 1.3; }
+  .plate .r { font-size: 9px; color: var(--text-dim); }
+  .plate-target { border-style: dashed; border-color: var(--border); opacity: 0.75; }
   .plate-target .w { color: var(--text-dim); }
 
-  .list-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
-  .list-item:last-child { border-bottom: none; }
-  .empty { color: var(--text-dim); font-size: 13px; text-align: center; padding: 20px 8px; }
+  .note-box { margin-top: 6px; padding: 7px 10px; background: var(--surface-alt); border-left: 2px solid var(--accent-dim); font-family: 'Kalam', cursive; font-size: 13px; color: #5a5040; font-style: italic; border-radius: 0 3px 3px 0; }
 
-  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: flex-end; justify-content: center; z-index: 50; }
-  .modal { background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--accent); border-radius: 8px 8px 0 0; padding: 18px 16px 24px; max-width: 720px; width: 100%; max-height: 85vh; overflow-y: auto; }
+  .list-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--paper-line); }
+  .list-item:last-child { border-bottom: none; }
+  .empty { color: var(--text-dim); font-size: 13px; text-align: center; padding: 20px 8px; font-style: italic; }
+
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(42,58,90,0.35); display: flex; align-items: flex-end; justify-content: center; z-index: 50; }
+  .modal { background: var(--bg); border: 1px solid var(--border); border-top: 3px solid var(--accent); border-radius: 8px 8px 0 0; padding: 18px 16px 24px; max-width: 720px; width: 100%; max-height: 85vh; overflow-y: auto; }
   .modal.fuel-modal { border-top-color: var(--fuel); }
   .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-  .modal-head h3 { font-family: 'Oswald', sans-serif; text-transform: uppercase; margin: 0; font-size: 17px; }
+  .modal-head h3 { font-family: 'Lora', Georgia, serif; font-weight: 600; margin: 0; font-size: 17px; }
 
   .day-btn { flex-direction: column; gap: 2px; font-size: 11px; padding: 8px 4px; position: relative; }
   .day-btn .muscle { display: block; font-size: 9px; opacity: 0.8; }
@@ -107,7 +116,7 @@ const DAYS = [
   { day: 3, muscle: "Legs" },
   { day: 4, muscle: "Upper Body" },
 ];
-const DAY_COLOR = { 1: "#E8B93F", 2: "#D97A3F", 3: "#8FA35E", 4: "#5E8FA3" };
+const DAY_COLOR = { 1: "#2A3A5A", 2: "#B5622A", 3: "#4F6B3A", 4: "#6B3A50" };
 const dayMuscle = (day) => (DAYS.find(d => d.day === day) || {}).muscle || "";
 
 const SEED_EXERCISES = [
@@ -342,10 +351,10 @@ function render() {
 
 function macroGauges(totals, targets) {
   const rows = [
-    { key: "calories", label: "Calories", color: "#E8B93F", unit: "" },
-    { key: "protein", label: "Protein", color: "#8FA35E", unit: "g" },
-    { key: "carbs", label: "Carbs", color: "#5E8FA3", unit: "g" },
-    { key: "fat", label: "Fat", color: "#C1443C", unit: "g" },
+    { key: "calories", label: "Calories", color: "#2A3A5A", unit: "" },
+    { key: "protein", label: "Protein", color: "#4F6B3A", unit: "g" },
+    { key: "carbs", label: "Carbs", color: "#3A5A7A", unit: "g" },
+    { key: "fat", label: "Fat", color: "#B31E23", unit: "g" },
   ];
   return rows.map(r => {
     const val = Math.round(totals[r.key]);
@@ -462,7 +471,8 @@ function renderTrainPage() {
       if (todayEntry) {
         historyBlock += `
           <div style="font-size:11px;color:var(--accent);margin:${target ? "10px" : "0"} 0 4px;">● Today</div>
-          <div class="plate-strip">${todayEntry.sets.map(s => `<div class="plate"><div class="w">${s.weight}</div><div class="r">×${s.reps}</div></div>`).join("")}</div>`;
+          <div class="plate-strip">${todayEntry.sets.map(s => `<div class="plate"><div class="w">${s.weight}</div><div class="r">×${s.reps}</div></div>`).join("")}</div>
+          ${todayEntry.note ? `<div class="note-box">"${escapeHtml(todayEntry.note)}"</div>` : ""}`;
       } else if (target) {
         historyBlock += `<div style="font-size:11px;color:var(--text-dim);margin-top:8px;">Not logged today yet — match or beat the target above.</div>`;
       }
@@ -483,7 +493,7 @@ function renderTrainPage() {
   }).join("");
 
   return `
-    <div class="card">
+    <div class="card card-journal">
       <h2>Training</h2>
       <div class="row" style="margin-bottom:12px;gap:6px;">${dayButtons}</div>
       ${isNextDay
@@ -499,12 +509,15 @@ function renderTrainPage() {
 function renderFoodPage() {
   const logs = todaysLogs(), totals = todaysTotals();
   const logRows = logs.map(l => `
-    <div class="list-item">
-      <div>
-        <div style="font-weight:600;">${escapeHtml(l.foodName)}</div>
-        <div class="mono" style="font-size:11px;color:var(--text-dim);">${l.servings}× · ${l.calories} kcal · P${l.protein} C${l.carbs} F${l.fat}</div>
+    <div style="border-bottom:1px solid var(--paper-line);padding:10px 0;">
+      <div class="list-item" style="border-bottom:none;padding:0;">
+        <div>
+          <div style="font-weight:600;">${escapeHtml(l.foodName)}</div>
+          <div class="mono" style="font-size:11px;color:var(--text-dim);">${l.servings}× · ${l.calories} kcal · P${l.protein} C${l.carbs} F${l.fat}</div>
+        </div>
+        <button class="icon-btn" data-action="deleteLog" data-id="${l.id}">✕</button>
       </div>
-      <button class="icon-btn" data-action="deleteLog" data-id="${l.id}">✕</button>
+      ${l.note ? `<div class="note-box">"${escapeHtml(l.note)}"</div>` : ""}
     </div>`).join("");
 
   const savedMeals = DB.nutrition.savedMeals || [];
@@ -536,7 +549,7 @@ function renderFoodPage() {
       <h2>Saved Meals</h2>
       ${savedMealRows}
     </div>` : ""}
-    <div class="card">
+    <div class="card card-journal">
       <h2>Today's Log</h2>
       ${logs.length === 0 ? `<div class="empty">Nothing logged yet — add what you've eaten below.</div>` : logRows}
       <button class="action fuel" style="margin-top:12px;" data-action="openLogMeal">+ Log a Meal</button>
@@ -557,6 +570,7 @@ function renderAccountPage() {
       </div>
       <div style="display:flex;gap:6px;">
         <button class="action fuel" style="font-size:11px;padding:6px 10px;" data-action="openLogFood" data-id="${f.id}">+ Log</button>
+        <button class="icon-btn" data-action="openEditFood" data-id="${f.id}">✎</button>
         <button class="icon-btn" data-action="deleteFood" data-id="${f.id}">✕</button>
       </div>
     </div>`).join("");
@@ -565,11 +579,14 @@ function renderAccountPage() {
     const exs = DB.workout.exercises.filter(e => e.day === d.day);
     const rows = exs.map(ex => `
       <div class="list-item">
-        <div>
+        <button style="flex:1;text-align:left;background:none;border:none;color:var(--text);cursor:pointer;padding:0;" data-action="openEditExercise" data-id="${ex.id}">
           <div style="font-weight:600;">${escapeHtml(ex.name)}</div>
           ${ex.target ? `<span class="mono" style="font-size:11px;color:var(--text-dim);">target ${escapeHtml(ex.target)}</span>` : ""}
+        </button>
+        <div style="display:flex;gap:6px;">
+          <button class="icon-btn" data-action="openEditExercise" data-id="${ex.id}">✎</button>
+          <button class="icon-btn" data-action="deleteExercise" data-id="${ex.id}">✕</button>
         </div>
-        <button class="icon-btn" data-action="deleteExercise" data-id="${ex.id}">✕</button>
       </div>`).join("");
     return `
       <div style="margin-bottom:14px;">
@@ -644,21 +661,25 @@ function renderHistory() {
     : `
       ${dayLogs.map(d => `<div style="font-size:12px;color:var(--accent);margin-bottom:8px;">✓ Day ${d.day} — ${dayMuscle(d.day)} marked complete</div>`).join("")}
       ${sets.map(s => `
-        <div style="border-bottom:1px solid var(--border);padding:8px 0;">
+        <div style="border-bottom:1px solid var(--paper-line);padding:8px 0;">
           <div style="font-weight:600;font-size:13px;">${escapeHtml(s.exerciseName)}</div>
           <div class="plate-strip" style="margin-top:6px;">${s.sets.map(x => `<div class="plate"><div class="w">${x.weight}</div><div class="r">×${x.reps}</div></div>`).join("")}</div>
+          ${s.note ? `<div class="note-box">"${escapeHtml(s.note)}"</div>` : ""}
         </div>`).join("")}
     `;
 
   const foodBlock = logs.length === 0
     ? `<div class="empty">No food logged this day.</div>`
     : logs.map(l => `
-        <div class="list-item">
-          <div>
-            <div style="font-weight:600;">${escapeHtml(l.foodName)}</div>
-            <div class="mono" style="font-size:11px;color:var(--text-dim);">${l.servings}× · ${l.calories} kcal · P${l.protein} C${l.carbs} F${l.fat}</div>
+        <div style="border-bottom:1px solid var(--paper-line);padding:8px 0;">
+          <div class="list-item" style="border-bottom:none;padding:0;">
+            <div>
+              <div style="font-weight:600;">${escapeHtml(l.foodName)}</div>
+              <div class="mono" style="font-size:11px;color:var(--text-dim);">${l.servings}× · ${l.calories} kcal · P${l.protein} C${l.carbs} F${l.fat}</div>
+            </div>
+            <button class="icon-btn" data-action="deleteLog" data-id="${l.id}">✕</button>
           </div>
-          <button class="icon-btn" data-action="deleteLog" data-id="${l.id}">✕</button>
+          ${l.note ? `<div class="note-box">"${escapeHtml(l.note)}"</div>` : ""}
         </div>`).join("");
 
   const quickDates = dates.slice(0, 10).map(d => `
@@ -671,11 +692,11 @@ function renderHistory() {
       <label class="field">Pick a date<input type="date" id="history-date-input" value="${date}" max="${todayStr()}" /></label>
       ${dates.length > 0 ? `<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;">${quickDates}</div>` : ""}
     </div>
-    <div class="card">
+    <div class="card card-journal">
       <h2>Training — ${fmtDate(date)}</h2>
       ${trainingBlock}
     </div>
-    <div class="card">
+    <div class="card card-journal">
       <h2>Fuel — ${fmtDate(date)}</h2>
       ${macroGauges(totals, DB.nutrition.targets)}
       <div style="margin-top:12px;">${foodBlock}</div>
@@ -688,16 +709,17 @@ function renderModal() {
   const m = UI.modal;
   if (!m) return "";
   if (m.type === "addExercise") {
+    const isEdit = !!m.editId;
     return `
       <div class="modal-backdrop" data-action="closeModal">
         <div class="modal">
-          <div class="modal-head"><h3>Add Exercise</h3><button class="icon-btn" data-action="closeModal">✕</button></div>
-          <label class="field">Name<input id="f-name" placeholder="e.g. Meadows Row" autofocus /></label>
+          <div class="modal-head"><h3>${isEdit ? "Edit Exercise" : "Add Exercise"}</h3><button class="icon-btn" data-action="closeModal">✕</button></div>
+          <label class="field">Name<input id="f-name" placeholder="e.g. Meadows Row" value="${escapeHtml(m.name || "")}" autofocus /></label>
           <label class="field">Day
             <select id="f-day">${DAYS.map(d => `<option value="${d.day}" ${d.day === m.day ? "selected" : ""}>Day ${d.day} — ${d.muscle}</option>`).join("")}</select>
           </label>
-          <label class="field">Target (optional)<input id="f-target" placeholder="e.g. 3×6–10" /></label>
-          <button class="action" data-action="saveAddExercise">+ Save Exercise</button>
+          <label class="field">Target (optional)<input id="f-target" placeholder="e.g. 3×6–10" value="${escapeHtml(m.target || "")}" /></label>
+          <button class="action" data-action="saveAddExercise">${isEdit ? "Save Changes" : "+ Save Exercise"}</button>
         </div>
       </div>`;
   }
@@ -716,26 +738,30 @@ function renderModal() {
             </div>`).join("")}
           <div style="display:flex;gap:8px;margin-top:8px;">
             <button class="action ghost" data-action="addSetRow">+ Add Set</button>
-            <button class="action" data-action="saveLogSets">Save Sets</button>
           </div>
+          <label class="field" style="margin-top:14px;">Note (optional) <span class="handwritten" style="font-size:13px;">✎</span>
+            <textarea id="f-note" rows="2" placeholder="felt strong today, chest was fresh…">${escapeHtml(m.note || "")}</textarea>
+          </label>
+          <button class="action" style="width:100%;justify-content:center;" data-action="saveLogSets">Save Sets</button>
         </div>
       </div>`;
   }
   if (m.type === "addFood") {
+    const isEdit = !!m.editId;
     return `
       <div class="modal-backdrop" data-action="closeModal">
         <div class="modal fuel-modal">
-          <div class="modal-head"><h3>Add Food</h3><button class="icon-btn" data-action="closeModal">✕</button></div>
-          <label class="field">Name<input id="f-name" placeholder="e.g. Chicken breast, 150g" autofocus /></label>
+          <div class="modal-head"><h3>${isEdit ? "Edit Food" : "Add Food"}</h3><button class="icon-btn" data-action="closeModal">✕</button></div>
+          <label class="field">Name<input id="f-name" placeholder="e.g. Chicken breast, 150g" value="${escapeHtml(m.name || "")}" autofocus /></label>
           <div class="row">
-            <label class="field">Calories<input id="f-cal" type="number" /></label>
-            <label class="field">Protein (g)<input id="f-pro" type="number" /></label>
+            <label class="field">Calories<input id="f-cal" type="number" value="${m.calories ?? ""}" /></label>
+            <label class="field">Protein (g)<input id="f-pro" type="number" value="${m.protein ?? ""}" /></label>
           </div>
           <div class="row">
-            <label class="field">Carbs (g)<input id="f-carb" type="number" /></label>
-            <label class="field">Fat (g)<input id="f-fat" type="number" /></label>
+            <label class="field">Carbs (g)<input id="f-carb" type="number" value="${m.carbs ?? ""}" /></label>
+            <label class="field">Fat (g)<input id="f-fat" type="number" value="${m.fat ?? ""}" /></label>
           </div>
-          <button class="action fuel" data-action="saveAddFood">+ Save Food</button>
+          <button class="action fuel" data-action="saveAddFood">${isEdit ? "Save Changes" : "+ Save Food"}</button>
         </div>
       </div>`;
   }
@@ -750,7 +776,10 @@ function renderModal() {
           <div class="mono" style="font-size:12px;color:var(--text-dim);margin-bottom:14px;">
             → ${Math.round(f.calories * n)} kcal · P${Math.round(f.protein * n)} C${Math.round(f.carbs * n)} F${Math.round(f.fat * n)}
           </div>
-          <button class="action fuel" data-action="saveLogFood" ${n <= 0 ? "disabled" : ""}>+ Log It</button>
+          <label class="field">Note (optional) <span class="handwritten" style="font-size:13px;">✎</span>
+            <textarea id="f-note" rows="2" placeholder="hungrier than usual before training…">${escapeHtml(m.note || "")}</textarea>
+          </label>
+          <button class="action fuel" style="width:100%;justify-content:center;" data-action="saveLogFood" ${n <= 0 ? "disabled" : ""}>+ Log It</button>
         </div>
       </div>`;
   }
@@ -908,15 +937,25 @@ function handleAction(action, el) {
     case "openAddExercise":
       UI.modal = { type: "addExercise", day: UI.viewDay };
       break;
+    case "openEditExercise": {
+      const ex = DB.workout.exercises.find(e => e.id === el.dataset.id);
+      if (!ex) break;
+      UI.modal = { type: "addExercise", editId: ex.id, name: ex.name, day: ex.day, target: ex.target };
+      break;
+    }
     case "saveAddExercise": {
       const name = document.getElementById("f-name").value.trim();
       const day = Number(document.getElementById("f-day").value);
       const target = document.getElementById("f-target").value.trim();
-      if (name) {
+      if (!name) break;
+      if (UI.modal.editId) {
+        const ex = DB.workout.exercises.find(e => e.id === UI.modal.editId);
+        if (ex) { ex.name = name; ex.day = day; ex.target = target; }
+      } else {
         DB.workout.exercises.push({ id: uid(), name, day, target });
-        saveDB();
-        UI.modal = null;
       }
+      saveDB();
+      UI.modal = null;
       break;
     }
     case "deleteExercise": {
@@ -938,7 +977,8 @@ function handleAction(action, el) {
     case "saveLogSets": {
       const ex = DB.workout.exercises.find(e => e.id === UI.modal.exerciseId);
       const sets = UI.modal.sets.map(s => ({ weight: Number(s.weight) || 0, reps: Number(s.reps) || 0 }));
-      DB.workout.sessions.push({ id: uid(), date: todayStr(), exerciseId: ex.id, exerciseName: ex.name, sets });
+      const note = (document.getElementById("f-note")?.value || "").trim();
+      DB.workout.sessions.push({ id: uid(), date: todayStr(), exerciseId: ex.id, exerciseName: ex.name, sets, note });
       saveDB();
       UI.modal = null;
       break;
@@ -955,17 +995,27 @@ function handleAction(action, el) {
     case "openAddFood":
       UI.modal = { type: "addFood" };
       break;
+    case "openEditFood": {
+      const f = DB.nutrition.foods.find(x => x.id === el.dataset.id);
+      if (!f) break;
+      UI.modal = { type: "addFood", editId: f.id, name: f.name, calories: f.calories, protein: f.protein, carbs: f.carbs, fat: f.fat };
+      break;
+    }
     case "saveAddFood": {
       const name = document.getElementById("f-name").value.trim();
       const calories = Number(document.getElementById("f-cal").value) || 0;
       const protein = Number(document.getElementById("f-pro").value) || 0;
       const carbs = Number(document.getElementById("f-carb").value) || 0;
       const fat = Number(document.getElementById("f-fat").value) || 0;
-      if (name) {
+      if (!name) break;
+      if (UI.modal.editId) {
+        const f = DB.nutrition.foods.find(x => x.id === UI.modal.editId);
+        if (f) { f.name = name; f.calories = calories; f.protein = protein; f.carbs = carbs; f.fat = fat; }
+      } else {
         DB.nutrition.foods.push({ id: uid(), name, calories, protein, carbs, fat });
-        saveDB();
-        UI.modal = null;
       }
+      saveDB();
+      UI.modal = null;
       break;
     }
     case "deleteFood": {
@@ -981,11 +1031,12 @@ function handleAction(action, el) {
     case "saveLogFood": {
       const f = DB.nutrition.foods.find(x => x.id === UI.modal.foodId);
       const servings = Number(UI.modal.servings) || 0;
+      const note = (document.getElementById("f-note")?.value || "").trim();
       if (servings > 0) {
         DB.nutrition.logs.push({
           id: uid(), date: todayStr(), foodId: f.id, foodName: f.name, servings,
           calories: Math.round(f.calories * servings), protein: Math.round(f.protein * servings),
-          carbs: Math.round(f.carbs * servings), fat: Math.round(f.fat * servings),
+          carbs: Math.round(f.carbs * servings), fat: Math.round(f.fat * servings), note,
         });
         saveDB();
         UI.modal = null;
@@ -1141,6 +1192,10 @@ function attachFieldListeners() {
       UI.modal.sets[idx][field] = elm.value;
     };
   });
+  const noteEl = document.getElementById("f-note");
+  if (noteEl) {
+    noteEl.oninput = () => { UI.modal.note = noteEl.value; };
+  }
   const servingsEl = document.querySelector('[data-action="updateServings"]');
   if (servingsEl) {
     servingsEl.oninput = () => {
